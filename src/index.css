@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/* Custom theme configuration */
+@theme {
+  --color-primary: #0e5488;
+  --color-primary-dark: #002256;
+  --color-top-nav: #1a1a1a;
+  --font-family-poppins: 'Poppins', sans-serif;
+}
+
+/* Base styles */
+body {
+  font-family: var(--font-family-poppins);
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+/* Custom components */
+@layer components {
+  .container-custom {
+    max-width: 1175px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+  
+  .section-padding {
+    padding-top: 30px;
+    padding-bottom: 30px;
+  }
+
+  .btn-primary {
+    background-color: var(--color-primary);
+    color: white;
+    padding: 10px 24px;
+    border-radius: 4px;
+    font-weight: 600;
+    transition: background-color 0.3s;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-primary-dark);
+  }
+
+  .card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    padding: 24px;
+  }
+
+  .section-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+}
