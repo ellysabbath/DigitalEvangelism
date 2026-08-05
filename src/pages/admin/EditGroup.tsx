@@ -3,14 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   FaArrowLeft, FaSpinner, FaSave, FaUsers, 
-  FaUserGraduate, FaChurch, FaUserTie, FaPlus,
+  FaUserTie, FaPlus,
   FaTrash, FaSearch, FaCheckCircle, FaTimesCircle,
   FaUserPlus, FaEnvelope, FaPhone, FaEdit,
-  FaSync
+  FaExclamationTriangle
 } from 'react-icons/fa';
 import { useAdmin } from '../../auth/context/AdminContext';
 import { groupsAPI } from '../../services/api';
-import type { Group } from '../../types/data';
 import toast from 'react-hot-toast';
 
 // ============================================
@@ -87,7 +86,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 const EditGroup: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { users, refreshAllGroups, loading } = useAdmin();
+  const { users, refreshAllGroups, refreshUsers, loadingUsers } = useAdmin();
   
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
@@ -95,7 +94,6 @@ const EditGroup: React.FC = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [showMemberSearch, setShowMemberSearch] = useState(false);
-  const [originalGroup, setOriginalGroup] = useState<Group | null>(null);
 
   // ========== FORM STATE ==========
   const [formData, setFormData] = useState({
@@ -120,16 +118,22 @@ const EditGroup: React.FC = () => {
       setError(null);
       
       try {
+        // First, ensure users are loaded
+        if (users.length === 0 && !loadingUsers) {
+          await refreshUsers();
+        }
+
         const response = await groupsAPI.get(parseInt(id));
         const data = response.data;
-        setOriginalGroup(data);
+        
+        const memberIds = data.members?.map((m: any) => m.id) || [];
         
         setFormData({
           name: data.name || '',
           type: data.type || 'student',
           description: data.description || '',
           leader: data.leader || null,
-          members: data.members?.map((m: any) => m.id) || [],
+          members: memberIds,
           is_active: data.is_active !== undefined ? data.is_active : true,
         });
       } catch (err: any) {
@@ -142,14 +146,17 @@ const EditGroup: React.FC = () => {
     };
 
     fetchGroup();
-  }, [id]);
+  }, [id, users.length, loadingUsers, refreshUsers]);
 
   // ========== FILTER USERS ==========
+  // Filter out users who are already in the group
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       user.full_name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
       user.email?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-      user.phone_number?.includes(memberSearchQuery);
+      user.phone_number?.includes(memberSearchQuery) ||
+      user.id?.toString().includes(memberSearchQuery);
+    // Exclude users already in the group
     return matchesSearch && !formData.members.includes(user.id);
   });
 
@@ -178,25 +185,41 @@ const EditGroup: React.FC = () => {
   };
 
   const handleAddMember = (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) {
+      toast.error('User not found');
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
       members: [...prev.members, userId],
     }));
     setMemberSearchQuery('');
-    toast.success('Member added to group');
+    toast.success(`${user.full_name || 'User'} added to group`);
+    
+    // Close search if no more users to add
+    const remainingUsers = users.filter(u => 
+      !formData.members.includes(u.id) && u.id !== userId
+    );
+    if (remainingUsers.length === 0) {
+      setShowMemberSearch(false);
+    }
   };
 
   const handleRemoveMember = (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    const userName = user?.full_name || 'User';
     setFormData(prev => ({
       ...prev,
       members: prev.members.filter(id => id !== userId),
     }));
-    toast.info('Member removed from group');
+    toast(`${userName} removed from group`, { icon: <FaEdit className="text-blue-500" /> });
   };
 
   const getMemberName = (userId: number) => {
     const user = users.find(u => u.id === userId);
-    return user?.full_name || user?.phone_number || 'Unknown';
+    return user?.full_name || user?.phone_number || `User #${userId}`;
   };
 
   const getMemberEmail = (userId: number) => {
@@ -212,7 +235,7 @@ const EditGroup: React.FC = () => {
   const getLeaderName = (userId: number | null) => {
     if (!userId) return 'None';
     const user = users.find(u => u.id === userId);
-    return user?.full_name || user?.phone_number || 'Unknown';
+    return user?.full_name || user?.phone_number || `User #${userId}`;
   };
 
   const getTypeLabel = (type: string) => {
@@ -259,7 +282,8 @@ const EditGroup: React.FC = () => {
         is_active: formData.is_active,
       };
 
-      console.log('Updating group:', updateData);
+      console.log('Updating group with data:', updateData);
+      console.log('Member IDs to update:', formData.members);
       
       const response = await groupsAPI.update(parseInt(id!), updateData);
       console.log('Group updated:', response.data);
@@ -446,11 +470,23 @@ const EditGroup: React.FC = () => {
             </h3>
             <p className="text-sm text-gray-500 mb-3">Select a user to be the leader of this group</p>
 
-            <div className="max-h-60 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
-              {users.length === 0 ? (
-                <p className="text-center text-gray-500 py-4">No users available</p>
-              ) : (
-                users.map((user) => (
+            {users.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                <FaExclamationTriangle className="text-3xl text-yellow-500 mx-auto mb-2" />
+                <p className="text-gray-500 font-medium">No users available</p>
+                <p className="text-sm text-gray-400">Please ensure users are loaded in the system</p>
+                <button
+                  type="button"
+                  onClick={refreshUsers}
+                  className="mt-3 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm transition-colors"
+                >
+                  <FaSpinner className={loadingUsers ? 'animate-spin inline mr-2' : 'inline mr-2'} />
+                  {loadingUsers ? 'Loading...' : 'Refresh Users'}
+                </button>
+              </div>
+            ) : (
+              <div className="max-h-60 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                {users.map((user) => (
                   <div
                     key={user.id}
                     className={`p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -469,16 +505,16 @@ const EditGroup: React.FC = () => {
                         <p className="text-xs text-gray-500 flex items-center">
                           <FaPhone className="mr-1" /> {user.phone_number || 'No phone'}
                         </p>
-                        <p className="text-xs text-gray-400">Role: {user.role || 'User'}</p>
+                        <p className="text-xs text-gray-400">Role: {user.role || 'User'} | ID: {user.id}</p>
                       </div>
                       {formData.leader === user.id && (
                         <FaCheckCircle className="text-purple-500 text-xl" />
                       )}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
 
             {formData.leader && (
               <div className="mt-3 p-2 bg-purple-50 rounded-lg border border-purple-200">
@@ -490,13 +526,18 @@ const EditGroup: React.FC = () => {
           </div>
 
           {/* Members Selection */}
-          <div className="border-b border-gray-200 pb-6">
+          <div className="pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
               <FaUserPlus className="mr-2 text-green-500" />
               Manage Members
             </h3>
             <p className="text-sm text-gray-500 mb-3">
               {formData.members.length} member(s) in this group.
+              {users.length > 0 && (
+                <span className="text-xs text-gray-400 ml-2">
+                  (Total users in system: {users.length})
+                </span>
+              )}
             </p>
 
             {/* Add Member Search */}
@@ -508,6 +549,11 @@ const EditGroup: React.FC = () => {
               >
                 <FaPlus className="mr-1" />
                 {showMemberSearch ? 'Close Member Search' : 'Add Members'}
+                {!showMemberSearch && formData.members.length > 0 && (
+                  <span className="ml-2 text-xs text-gray-400">
+                    (Total: {formData.members.length} members)
+                  </span>
+                )}
               </button>
 
               {showMemberSearch && (
@@ -516,7 +562,7 @@ const EditGroup: React.FC = () => {
                     <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Search users by name, email or phone..."
+                      placeholder="Search users by name, email, phone or ID..."
                       value={memberSearchQuery}
                       onChange={(e) => setMemberSearchQuery(e.target.value)}
                       className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
@@ -524,8 +570,34 @@ const EditGroup: React.FC = () => {
                   </div>
 
                   <div className="max-h-40 overflow-y-auto space-y-2">
-                    {filteredUsers.length === 0 ? (
-                      <p className="text-center text-gray-500 py-2">No users found</p>
+                    {users.length === 0 ? (
+                      <div className="text-center py-4">
+                        <FaExclamationTriangle className="text-2xl text-yellow-500 mx-auto mb-2" />
+                        <p className="text-gray-500 text-sm">No users loaded in the system</p>
+                        <button
+                          type="button"
+                          onClick={refreshUsers}
+                          className="mt-2 text-sm text-cyan-600 hover:text-cyan-700"
+                        >
+                          Load Users
+                        </button>
+                      </div>
+                    ) : filteredUsers.length === 0 ? (
+                      <div className="text-center py-4">
+                        <p className="text-gray-500 text-sm">
+                          {memberSearchQuery ? 'No users found matching your search' : 'All available users have been added to this group'}
+                        </p>
+                        {formData.members.length > 0 && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            Currently {formData.members.length} members in the group
+                          </p>
+                        )}
+                        {!memberSearchQuery && formData.members.length === users.length && (
+                          <p className="text-xs text-green-500 mt-1">
+                            All {users.length} users are already in this group
+                          </p>
+                        )}
+                      </div>
                     ) : (
                       filteredUsers.map((user) => (
                         <div
@@ -537,6 +609,8 @@ const EditGroup: React.FC = () => {
                             <div>
                               <p className="font-medium text-gray-900">{user.full_name || 'Unknown'}</p>
                               <p className="text-xs text-gray-500">{user.email || 'No email'}</p>
+                              <p className="text-xs text-gray-500">{user.phone_number || 'No phone'}</p>
+                              <p className="text-xs text-gray-400">Role: {user.role || 'User'} | ID: {user.id}</p>
                             </div>
                             <FaUserPlus className="text-green-500" />
                           </div>
@@ -544,6 +618,12 @@ const EditGroup: React.FC = () => {
                       ))
                     )}
                   </div>
+                  
+                  {filteredUsers.length > 0 && (
+                    <div className="mt-3 text-xs text-gray-400 text-center">
+                      {filteredUsers.length} user(s) available to add
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -551,44 +631,78 @@ const EditGroup: React.FC = () => {
             {/* Members List */}
             {formData.members.length > 0 ? (
               <div className="space-y-2">
-                {formData.members.map((userId) => (
-                  <div key={userId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <div>
-                      <p className="font-medium text-gray-900">{getMemberName(userId)}</p>
-                      <p className="text-xs text-gray-500 flex items-center">
-                        <FaEnvelope className="mr-1" /> {getMemberEmail(userId) || 'No email'}
-                      </p>
-                      <p className="text-xs text-gray-500 flex items-center">
-                        <FaPhone className="mr-1" /> {getMemberPhone(userId) || 'No phone'}
-                      </p>
+                {formData.members.map((userId) => {
+                  const user = users.find(u => u.id === userId);
+                  return (
+                    <div key={userId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-white hover:shadow-sm transition-all">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm">
+                          {getMemberName(userId).charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{getMemberName(userId)}</p>
+                          <p className="text-xs text-gray-500 flex items-center">
+                            <FaEnvelope className="mr-1" size={12} /> {getMemberEmail(userId) || 'No email'}
+                          </p>
+                          <p className="text-xs text-gray-500 flex items-center">
+                            <FaPhone className="mr-1" size={12} /> {getMemberPhone(userId) || 'No phone'}
+                          </p>
+                          {user && (
+                            <p className="text-xs text-gray-400">Role: {user.role || 'User'} | ID: {user.id}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {user?.is_online && (
+                          <span className="text-xs text-green-600 flex items-center">
+                            <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                            Online
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(userId)}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Remove member"
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMember(userId)}
-                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Remove member"
-                    >
-                      <FaTrash />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-center">
+                <FaUsers className="text-3xl text-gray-300 mx-auto mb-2" />
                 <p className="text-gray-500 text-sm">No members in this group</p>
+                <p className="text-xs text-gray-400">Click "Add Members" above to add users to this group</p>
               </div>
             )}
           </div>
 
           {/* Summary */}
           <div className="p-4 bg-cyan-50 rounded-lg border border-cyan-200">
-            <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
-            <div className="space-y-1 text-sm">
-              <p><span className="font-medium text-gray-700">Name:</span> {formData.name || '(Not set)'}</p>
-              <p><span className="font-medium text-gray-700">Type:</span> {getTypeLabel(formData.type)}</p>
-              <p><span className="font-medium text-gray-700">Leader:</span> {getLeaderName(formData.leader)}</p>
-              <p><span className="font-medium text-gray-700">Members:</span> {formData.members.length} member(s)</p>
-              <p><span className="font-medium text-gray-700">Status:</span> {formData.is_active ? 'Active' : 'Inactive'}</p>
+            <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
+              <FaCheckCircle className="text-cyan-500 mr-2" />
+              Summary
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="font-medium text-gray-700">Name:</span> {formData.name || '(Not set)'}
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Type:</span> {getTypeLabel(formData.type)}
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Leader:</span> {getLeaderName(formData.leader)}
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Members:</span> {formData.members.length} member(s)
+              </div>
+              <div className="md:col-span-2">
+                <span className="font-medium text-gray-700">Status:</span> {formData.is_active ? 'Active' : 'Inactive'}
+              </div>
             </div>
           </div>
 

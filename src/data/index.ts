@@ -1,4 +1,4 @@
-import { MenuItem, NewsItem, SlideItem, SocialLink, FooterLink } from '../types';
+import type { MenuItem, NewsItem, SlideItem, SocialLink, FooterLink } from '../types';
 
 export const topNavMenu: MenuItem[] = [
   {

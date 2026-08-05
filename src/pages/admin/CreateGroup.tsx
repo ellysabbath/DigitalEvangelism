@@ -1,15 +1,14 @@
 // src/pages/admin/CreateGroup.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FaArrowLeft, FaSpinner, FaSave, FaUsers, 
-  FaUserGraduate, FaChurch, FaUserTie, FaPlus,
-  FaTrash, FaSearch, FaCheckCircle, FaTimesCircle,
-  FaUserPlus, FaEnvelope, FaPhone
+   FaUserTie, FaPlus,
+  FaTrash, FaSearch, FaCheckCircle,
+  FaUserPlus, FaEnvelope, FaPhone, FaInfoCircle
 } from 'react-icons/fa';
 import { useAdmin } from '../../auth/context/AdminContext';
 import { groupsAPI } from '../../services/api';
-
 import toast from 'react-hot-toast';
 
 // ============================================
@@ -149,7 +148,7 @@ const CreateGroup: React.FC = () => {
       ...prev,
       members: prev.members.filter(id => id !== userId),
     }));
-    toast.info('Member removed from group');
+    toast('Member removed from group', { icon: <FaInfoCircle className="text-blue-500" /> });
   };
 
   const getMemberName = (userId: number) => {
@@ -186,19 +185,6 @@ const CreateGroup: React.FC = () => {
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch(type) {
-      case 'evangelist':
-        return <FaChurch className="text-blue-500" />;
-      case 'student':
-        return <FaUserGraduate className="text-green-500" />;
-      case 'mixed':
-        return <FaUsers className="text-purple-500" />;
-      default:
-        return <FaUsers className="text-gray-500" />;
-    }
-  };
-
   // ========== SUBMIT ==========
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,16 +199,6 @@ const CreateGroup: React.FC = () => {
       toast.error('Please select a group leader');
       return;
     }
-
-    // Prepare data for backend
-    const groupData = {
-      name: formData.name.trim(),
-      type: formData.type,
-      description: formData.description.trim(),
-      leader: formData.leader,
-      members: formData.members,
-      is_active: formData.is_active,
-    };
 
     // Show confirmation
     setShowConfirmation(true);

@@ -1,3 +1,4 @@
+// src/context/registrationContext.tsx
 import React, { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { RegistrationData, Step } from '../types/registration';
@@ -87,8 +88,10 @@ export const RegistrationProvider: React.FC<RegistrationProviderProps> = ({ chil
     setIsSubmitting(true);
     
     try {
-      // Send the full formData including confirmPassword
-      const result = await registrationApi.register(formData);
+      // Remove confirmPassword before sending to API
+      const { confirmPassword, ...submitData } = formData;
+      
+      const result = await registrationApi.register(submitData);
       console.log('API Response:', result);
       
       if (result.success) {
@@ -99,10 +102,22 @@ export const RegistrationProvider: React.FC<RegistrationProviderProps> = ({ chil
         };
       } else {
         let errorMessage = result.error || 'Registration failed';
+        
+        // Handle different error formats
         if (result.errors) {
-          const errorStrings = Object.values(result.errors).flat();
-          errorMessage = errorStrings.join(', ');
+          if (Array.isArray(result.errors)) {
+            // Array of error objects - each might have 'msg' or 'message'
+            const errorStrings = result.errors.map((err: any) => {
+              return err.msg || err.message || err.error || String(err);
+            });
+            errorMessage = errorStrings.join(', ');
+          } else if (typeof result.errors === 'object') {
+            // Object with field names as keys
+            const errorStrings = Object.values(result.errors).flat();
+            errorMessage = errorStrings.join(', ');
+          }
         }
+        
         return { 
           success: false, 
           error: errorMessage,

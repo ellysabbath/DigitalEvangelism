@@ -1,12 +1,12 @@
 // src/pages/SermonDetail.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   FaHeart, FaComment, FaShare, FaBookmark, 
   FaQrcode, FaFacebook, FaTwitter, FaWhatsapp, 
-  FaTelegram, FaCopy, FaArrowLeft, FaUser, 
+  FaTelegram, FaCopy, FaArrowLeft, 
   FaCalendar, FaClock, FaCheckCircle, FaUserPlus,
-  FaSpinner, FaUsers, FaEye, FaBible, 
+  FaSpinner, FaUsers, FaBible, 
   FaChartLine, FaTimesCircle, FaQuestion,
   FaEdit, FaCheck, FaList, FaExclamationTriangle
 } from 'react-icons/fa';
@@ -42,12 +42,12 @@ const SermonDetail: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { 
-    refreshAllSermons, 
     refreshExamSubmissions,
     submitExam,
     checkSubmission
   } = useAdmin();
   
+  // ========== STATE ==========
   const [sermon, setSermon] = useState<SermonData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,21 +66,23 @@ const SermonDetail: React.FC = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   
-  // Exam state
-  const [examAnswers, setExamAnswers] = useState<Record<string, string | string[]>>({});
+  // Exam state - using index as key
+  const [examAnswers, setExamAnswers] = useState<Record<number, string | string[]>>({});
   const [isSubmittingExam, setIsSubmittingExam] = useState(false);
   const [hasExistingSubmission, setHasExistingSubmission] = useState(false);
   const [examStartTime, setExamStartTime] = useState<number | null>(null);
 
+  // ========== REFS TO PREVENT DUPLICATE REQUESTS ==========
+  const hasFetchedSermon = useRef(false);
+  const hasCheckedSubmission = useRef(false);
+  const hasFetchedComments = useRef(false);
+
   // ========== FETCH SERMON ==========
   useEffect(() => {
-    const fetchSermon = async () => {
-      if (!id) {
-        setError('Sermon ID not provided');
-        setLoading(false);
-        return;
-      }
+    if (!id || hasFetchedSermon.current) return;
+    hasFetchedSermon.current = true;
 
+    const fetchSermon = async () => {
       setLoading(true);
       setError(null);
       
@@ -91,16 +93,13 @@ const SermonDetail: React.FC = () => {
         setLikeCount(response.data.likes || 0);
         
         const liked = localStorage.getItem(`liked_${id}`);
-        if (liked) {
-          setIsLiked(true);
-        }
+        if (liked) setIsLiked(true);
 
-        // Check if user has already submitted exam - FROM BACKEND
-        if (user) {
-          const submitted = await checkSubmission(sermonId, user.id);
-          setHasExistingSubmission(submitted);
-          setExamSubmitted(submitted);
-        }
+        const bookmarkedItem = localStorage.getItem(`bookmarked_${id}`);
+        if (bookmarkedItem) setBookmarked(true);
+
+        const joined = localStorage.getItem(`joined_${id}`);
+        if (joined) setHasJoined(true);
         
       } catch (err: any) {
         console.error('Error fetching sermon:', err);
@@ -112,47 +111,56 @@ const SermonDetail: React.FC = () => {
     };
 
     fetchSermon();
+  }, [id]);
+
+  // ========== CHECK SUBMISSION ==========
+  useEffect(() => {
+    if (!id || !user || hasCheckedSubmission.current) return;
+    hasCheckedSubmission.current = true;
+
+    const checkExistingSubmission = async () => {
+      try {
+        const sermonId = parseInt(id);
+        const submitted = await checkSubmission(sermonId, user.id);
+        setHasExistingSubmission(submitted);
+        setExamSubmitted(submitted);
+      } catch (error) {
+        console.error('Error checking submission:', error);
+      }
+    };
+
+    checkExistingSubmission();
   }, [id, user, checkSubmission]);
 
   // ========== FETCH COMMENTS ==========
   useEffect(() => {
-    if (sermon) {
-      fetchComments();
-    }
-  }, [sermon]);
+    if (!id || hasFetchedComments.current) return;
+    hasFetchedComments.current = true;
 
-  const fetchComments = async () => {
-    if (!sermon) return;
-    
-    setLoadingComments(true);
-    try {
-      const response = await commentsAPI.list(sermon.id);
-      setComments(response.data);
-    } catch (error: any) {
-      console.error('Error fetching comments:', error);
-      toast.error('Failed to load comments');
-    } finally {
-      setLoadingComments(false);
-    }
-  };
-
-  // ========== CHECK JOINED ==========
-  useEffect(() => {
-    if (sermon) {
-      const joined = localStorage.getItem(`joined_${sermon.id}`);
-      if (joined) {
-        setHasJoined(true);
+    const fetchComments = async () => {
+      if (!sermon) return;
+      
+      setLoadingComments(true);
+      try {
+        const response = await commentsAPI.list(sermon.id);
+        setComments(response.data);
+      } catch (error: any) {
+        console.error('Error fetching comments:', error);
+      } finally {
+        setLoadingComments(false);
       }
-    }
-  }, [sermon]);
+    };
+
+    fetchComments();
+  }, [id, sermon]);
 
   // ========== HANDLE LIKE ==========
   const handleLike = async () => {
-    if (isLiking) return;
+    if (isLiking || !id) return;
     
     setIsLiking(true);
     try {
-      const sermonId = parseInt(id!);
+      const sermonId = parseInt(id);
       const newLikeState = !isLiked;
       
       setIsLiked(newLikeState);
@@ -202,7 +210,7 @@ const SermonDetail: React.FC = () => {
         content: comment.trim()
       });
       
-      setComments([response.data, ...comments]);
+      setComments(prev => [response.data, ...prev]);
       setComment('');
       toast.success('Comment posted successfully!');
     } catch (error: any) {
@@ -294,14 +302,14 @@ const SermonDetail: React.FC = () => {
   };
 
   // ========== HANDLE EXAM ANSWER CHANGE ==========
-  const handleExamAnswerChange = (questionId: string, value: string | string[]) => {
+  const handleExamAnswerChange = (questionIndex: number, value: string | string[]) => {
     setExamAnswers(prev => ({
       ...prev,
-      [questionId]: value
+      [questionIndex]: value
     }));
   };
 
-  // ========== SUBMIT EXAM TO DATABASE ==========
+  // ========== SUBMIT EXAM ==========
   const handleSubmitExam = async () => {
     if (!user) {
       toast.error('Please login to submit the exam');
@@ -310,11 +318,14 @@ const SermonDetail: React.FC = () => {
     }
 
     if (!sermon) return;
+    
+    const questions = sermon.questions || [];
 
     // Validate all required questions are answered
-    const requiredQuestions = sermon.questions.filter((q: any) => q.required);
-    const unansweredRequired = requiredQuestions.filter((q: any) => {
-      const answer = examAnswers[q.id];
+    const requiredQuestions = questions.filter((q: any) => q.required);
+    const unansweredRequired = requiredQuestions.filter((q: any, index: number) => {
+      const questionIndex = questions.indexOf(q);
+      const answer = examAnswers[questionIndex];
       return !answer || (Array.isArray(answer) && answer.length === 0);
     });
 
@@ -328,17 +339,39 @@ const SermonDetail: React.FC = () => {
     try {
       const timeTaken = examStartTime ? Math.floor((Date.now() - examStartTime) / 60000) : 0;
 
-      // Format answers for submission
-      const formattedAnswers = sermon.questions.map((q: any) => ({
-        questionId: q.id,
-        answer: examAnswers[q.id] || (q.type === 'checkbox' ? [] : ''),
-        maxScore: q.maxScore || 0
-      }));
+      // Format answers - ensure questionId is properly set
+      const formattedAnswers = questions.map((q: any, index: number) => {
+        const answer = examAnswers[index];
+        
+        let formattedAnswer = answer || '';
+        if (q.type === 'checkbox' && !Array.isArray(formattedAnswer)) {
+          formattedAnswer = [];
+        }
+        if (q.type !== 'checkbox' && typeof formattedAnswer !== 'string') {
+          formattedAnswer = '';
+        }
+        
+        // CRITICAL: Use question ID if available, otherwise generate one
+        let questionId = q.id;
+        if (!questionId) {
+          questionId = `q_${Date.now()}_${index}`;
+          q.id = questionId;
+        }
+        
+        return {
+          questionId: questionId,
+          answer: formattedAnswer,
+          maxScore: q.maxScore || 10
+        };
+      });
 
-      // Submit to backend database
+      console.log('📤 Submitting exam with answers:', formattedAnswers);
+
+      // Submit to backend database with student_id
       await submitExam(sermon.id, {
         answers: formattedAnswers,
-        timeTaken: timeTaken
+        timeTaken: timeTaken,
+        student_id: user.id
       });
 
       setExamSubmitted(true);
@@ -347,7 +380,6 @@ const SermonDetail: React.FC = () => {
       toast.success('Exam submitted successfully! The admin will review your answers.');
       setShowExam(false);
       
-      // Refresh submissions for admin view
       await refreshExamSubmissions({});
       
     } catch (error: any) {
@@ -362,13 +394,13 @@ const SermonDetail: React.FC = () => {
   const toggleExam = () => {
     if (!showExam && !examSubmitted && !hasExistingSubmission) {
       setExamStartTime(Date.now());
-      // Initialize exam answers
-      const initialAnswers: Record<string, string | string[]> = {};
-      sermon?.questions.forEach((q: any) => {
+      const initialAnswers: Record<number, string | string[]> = {};
+      const questions = sermon?.questions || [];
+      questions.forEach((q: any, index: number) => {
         if (q.type === 'checkbox') {
-          initialAnswers[q.id] = [];
+          initialAnswers[index] = [];
         } else {
-          initialAnswers[q.id] = '';
+          initialAnswers[index] = '';
         }
       });
       setExamAnswers(initialAnswers);
@@ -379,18 +411,12 @@ const SermonDetail: React.FC = () => {
   // ========== HELPERS ==========
   const getQuestionTypeIcon = (type: string) => {
     switch(type) {
-      case 'short_answer':
-        return <FaEdit className="text-blue-500" />;
-      case 'long_answer':
-        return <FaEdit className="text-purple-500" />;
-      case 'checkbox':
-        return <FaCheckCircle className="text-green-500" />;
-      case 'radio':
-        return <FaList className="text-orange-500" />;
-      case 'true_false':
-        return <FaCheck className="text-red-500" />;
-      default:
-        return <FaQuestion className="text-gray-500" />;
+      case 'short_answer': return <FaEdit className="text-blue-500" />;
+      case 'long_answer': return <FaEdit className="text-purple-500" />;
+      case 'checkbox': return <FaCheckCircle className="text-green-500" />;
+      case 'radio': return <FaList className="text-orange-500" />;
+      case 'true_false': return <FaCheck className="text-red-500" />;
+      default: return <FaQuestion className="text-gray-500" />;
     }
   };
 
@@ -678,10 +704,10 @@ const SermonDetail: React.FC = () => {
               {showExam && !examSubmitted && !hasExistingSubmission && (
                 <div className="mt-4 space-y-6">
                   {questions.map((q: any, index: number) => {
-                    const currentAnswer = examAnswers[q.id] || (q.type === 'checkbox' ? [] : '');
+                    const currentAnswer = examAnswers[index];
                     
                     return (
-                      <div key={q.id || index} className="p-4 border border-gray-200 rounded-lg hover:border-cyan-200 transition-colors">
+                      <div key={index} className="p-4 border border-gray-200 rounded-lg hover:border-cyan-200 transition-colors">
                         <div className="flex items-center space-x-2 mb-2">
                           <span className="text-xs font-medium text-gray-500">Q{index + 1}</span>
                           {getQuestionTypeIcon(q.type || 'short_answer')}
@@ -702,7 +728,7 @@ const SermonDetail: React.FC = () => {
                             className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                             placeholder="Type your answer..."
                             value={currentAnswer as string || ''}
-                            onChange={(e) => handleExamAnswerChange(q.id, e.target.value)}
+                            onChange={(e) => handleExamAnswerChange(index, e.target.value)}
                           />
                         )}
                         
@@ -713,7 +739,7 @@ const SermonDetail: React.FC = () => {
                             rows={3}
                             placeholder="Write your answer..."
                             value={currentAnswer as string || ''}
-                            onChange={(e) => handleExamAnswerChange(q.id, e.target.value)}
+                            onChange={(e) => handleExamAnswerChange(index, e.target.value)}
                           />
                         )}
                         
@@ -729,19 +755,19 @@ const SermonDetail: React.FC = () => {
                                 <label key={optIndex} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                                   <input 
                                     type={q.type === 'checkbox' ? 'checkbox' : 'radio'} 
-                                    name={`question_${q.id}`}
+                                    name={`question_${index}`}
                                     value={option}
                                     checked={isChecked}
                                     onChange={() => {
                                       if (q.type === 'checkbox') {
                                         const current = currentAnswer as string[] || [];
                                         if (isChecked) {
-                                          handleExamAnswerChange(q.id, current.filter((v: string) => v !== option));
+                                          handleExamAnswerChange(index, current.filter((v: string) => v !== option));
                                         } else {
-                                          handleExamAnswerChange(q.id, [...current, option]);
+                                          handleExamAnswerChange(index, [...current, option]);
                                         }
                                       } else {
-                                        handleExamAnswerChange(q.id, option);
+                                        handleExamAnswerChange(index, option);
                                       }
                                     }}
                                     className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500" 
@@ -759,10 +785,10 @@ const SermonDetail: React.FC = () => {
                             <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                               <input 
                                 type="radio" 
-                                name={`true_false_${q.id}`} 
+                                name={`true_false_${index}`}
                                 value="true"
                                 checked={currentAnswer === 'true'}
-                                onChange={() => handleExamAnswerChange(q.id, 'true')}
+                                onChange={() => handleExamAnswerChange(index, 'true')}
                                 className="text-cyan-600 focus:ring-cyan-500" 
                               />
                               <span className="text-sm text-gray-700">True</span>
@@ -770,10 +796,10 @@ const SermonDetail: React.FC = () => {
                             <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                               <input 
                                 type="radio" 
-                                name={`true_false_${q.id}`} 
+                                name={`true_false_${index}`}
                                 value="false"
                                 checked={currentAnswer === 'false'}
-                                onChange={() => handleExamAnswerChange(q.id, 'false')}
+                                onChange={() => handleExamAnswerChange(index, 'false')}
                                 className="text-cyan-600 focus:ring-cyan-500" 
                               />
                               <span className="text-sm text-gray-700">False</span>

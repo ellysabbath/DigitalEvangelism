@@ -1,0 +1,3355 @@
+model    from django.db import models
+
+# Create your models here.
+from django.db import models
+from django.conf import settings
+from django.utils import timezone
+
+class Group(models.Model):
+    GROUP_TYPES = [
+        ('evangelist', 'Evangelist Group'),
+        ('student', 'Student Group'),
+        ('mixed', 'Mixed Group'),
+    ]
+    
+    name = models.CharField(max_length=255)
+    type = models.CharField(max_length=20, choices=GROUP_TYPES, default='student')
+    description = models.TextField(blank=True)
+    
+    # Leader
+    leader = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='led_groups'
+    )
+    
+    # Members (for student groups)
+    members = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='groups_member',
+        blank=True
+    )
+    
+    # Status
+    is_active = models.BooleanField(default=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'groups'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['type']),
+            models.Index(fields=['is_active']),
+        ]
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_type_display()})"
+    
+    def get_member_count(self):
+        return self.members.count()
+
+    def get_leader_name(self):
+        return self.leader.full_name if self.leader else 'No leader assigned',    serializers    from rest_framework import serializers
+from .models import Group
+from accounts.serializers import UserSerializer
+
+class GroupSerializer(serializers.ModelSerializer):
+    leader_name = serializers.SerializerMethodField()
+    member_count = serializers.SerializerMethodField()
+    members = UserSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Group
+        fields = [
+            'id', 'name', 'type', 'description', 'leader',
+            'leader_name', 'members', 'member_count',
+            'is_active', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_leader_name(self, obj):
+        return obj.get_leader_name()
+    
+    def get_member_count(self, obj):
+        return obj.get_member_count(),  views  from django.shortcuts import render
+
+# Create your views here.
+from rest_framework import generics, status, permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.db.models import Q, Count
+from .models import Group
+from .serializers import GroupSerializer
+from accounts.models import User
+
+class GroupListView(generics.ListAPIView):
+    serializer_class = GroupSerializer
+    
+    def get_queryset(self):
+        queryset = Group.objects.all()
+        
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(description__icontains=search)
+            )
+        
+        group_type = self.request.query_params.get('type')
+        if group_type:
+            queryset = queryset.filter(type=group_type)
+        
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            if status_filter == 'active':
+                queryset = queryset.filter(is_active=True)
+            elif status_filter == 'inactive':
+                queryset = queryset.filter(is_active=False)
+        
+        return queryset
+
+class GroupCreateView(generics.CreateAPIView):
+    serializer_class = GroupSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+class GroupRetrieveView(generics.RetrieveAPIView):
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+
+class GroupUpdateView(generics.UpdateAPIView):
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+
+class GroupDeleteView(generics.DestroyAPIView):
+    queryset = Group.objects.all()
+
+class GroupAddMemberView(APIView):
+    def post(self, request, pk):
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            group = Group.objects.get(pk=pk)
+            user = User.objects.get(pk=user_id)
+            group.members.add(user)
+            return Response({'message': f'User {user.full_name} added to group'})
+        except Group.DoesNotExist:
+            return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+class GroupRemoveMemberView(APIView):
+    def delete(self, request, pk):
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            group = Group.objects.get(pk=pk)
+            user = User.objects.get(pk=user_id)
+            group.members.remove(user)
+            return Response({'message': f'User {user.full_name} removed from group'})
+        except Group.DoesNotExist:
+            return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND),  urls   from django.urls import path
+from .views import (
+    GroupListView,
+    GroupCreateView,
+    GroupRetrieveView,
+    GroupUpdateView,
+    GroupDeleteView,
+    GroupAddMemberView,
+    GroupRemoveMemberView
+)
+
+urlpatterns = [
+    path('', GroupListView.as_view(), name='group-list'),
+    path('create/', GroupCreateView.as_view(), name='group-create'),
+    path('<int:pk>/', GroupRetrieveView.as_view(), name='group-detail'),
+    path('<int:pk>/update/', GroupUpdateView.as_view(), name='group-update'),
+    path('<int:pk>/delete/', GroupDeleteView.as_view(), name='group-delete'),
+    path('<int:pk>/add-member/', GroupAddMemberView.as_view(), name='group-add-member'),
+    path('<int:pk>/remove-member/', GroupRemoveMemberView.as_view(), name='group-remove-member'),
+],    data.ts     // src/types/data.ts
+
+// ============================================
+// USER TYPES
+// ============================================
+export interface User {
+  id: number;
+  full_name: string;
+  phone_number: string;
+  email: string;
+  role: string;
+  role_display: string;
+  country_code: string;
+  church_name: string;
+  region: string;
+  city: string;
+  street: string;
+  profile: {
+    id: number;
+    profile_picture: string | null;
+    profile_picture_thumbnail: string | null;
+    bio: string;
+    location: string;
+    created_at: string;
+    updated_at: string;
+  };
+  is_verified: boolean;
+  is_active: boolean;
+  is_online: boolean;
+  date_joined: string;
+  last_login: string | null;
+  last_seen: string | null;
+  full_phone_number: string;
+}
+
+export interface RegisterData {
+  full_name: string;
+  phone_number: string;
+  email: string;
+  country_code: string;
+  church_name?: string;
+  region: string;
+  city: string;
+  street?: string;
+  profile?: {
+    bio?: string;
+    profile_picture?: string | null;
+  };
+}
+
+export interface RegisterResponse {
+  message: string;
+  user: User;
+  verification_codes: string[];
+  phone_number: string;
+}
+
+export interface LoginResponse {
+  access: string;
+  refresh: string;
+  user: User;
+  requires_verification?: boolean;
+  phone_number?: string;
+}
+
+export interface VerifyResponse {
+  message: string;
+  access: string;
+  refresh: string;
+  user: User;
+}
+
+export interface CountryCode {
+  code: string;
+  country: string;
+  flag: string;
+}
+
+export interface AuthError {
+  error?: string;
+  [key: string]: any;
+}
+
+export interface CheckUserCodesResponse {
+  exists: boolean;
+  has_codes: boolean;
+  is_verified?: boolean;
+  full_name?: string;
+  phone_number?: string;
+  is_active?: boolean;
+  role?: string;
+  verification_codes_count?: number;
+  verification_codes?: string[];
+}
+
+export interface GenerateLoginCodesResponse {
+  message: string;
+  verification_codes: string[];
+  phone_number: string;
+  user?: User;
+}
+
+// ============================================
+// USER CRUD TYPES
+// ============================================
+export interface UserCRUD {
+  id: number;
+  phone_number: string;
+  email: string;
+  full_name: string;
+  role: string;
+  role_display: string;
+  church_name: string;
+  region: string;
+  city: string;
+  street: string;
+  country_code: string;
+  is_verified: boolean;
+  is_active: boolean;
+  is_staff: boolean;
+  is_superuser: boolean;
+  is_online: boolean;
+  date_joined: string;
+  last_login: string | null;
+  last_seen: string | null;
+  verification_codes: string[];
+  profile: {
+    id: number;
+    profile_picture: string | null;
+    profile_picture_thumbnail: string | null;
+    bio: string;
+    location: string;
+    created_at: string;
+    updated_at: string;
+  };
+  full_phone_number: string;
+}
+
+export interface UserCreateData {
+  phone_number: string;
+  email: string;
+  full_name: string;
+  role: string;
+  password: string;
+  church_name?: string;
+  region: string;
+  city: string;
+  street?: string;
+  country_code?: string;
+  is_verified?: boolean;
+  is_active?: boolean;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  profile?: {
+    bio?: string;
+    profile_picture?: string | null;
+    location?: string;
+  };
+}
+
+export interface UserUpdateData {
+  phone_number?: string;
+  email?: string;
+  full_name?: string;
+  role?: string;
+  church_name?: string;
+  region?: string;
+  city?: string;
+  street?: string;
+  country_code?: string;
+  is_verified?: boolean;
+  is_active?: boolean;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  profile?: {
+    bio?: string;
+    profile_picture?: string | null;
+    location?: string;
+  };
+}
+
+export interface BulkCreateData {
+  users: UserCreateData[];
+}
+
+export interface BulkCreateResponse {
+  message: string;
+  total_processed: number;
+  total_created: number;
+  total_errors: number;
+  users?: UserCRUD[];
+  errors?: Array<{
+    index: number;
+    data: any;
+    error: string;
+  }>;
+}
+
+export interface FilterOptions {
+  roles: string[];
+  regions: string[];
+  cities: string[];
+  churches: string[];
+  filters: {
+    is_verified: boolean[];
+    is_active: boolean[];
+    is_online: boolean[];
+  };
+}
+
+export interface UserStats {
+  total_users: number;
+  active_users: number;
+  verified_users: number;
+  online_users: number;
+  role_stats: {
+    evangelist: number;
+    pastor: number;
+    church_admin: number;
+    super_admin: number;
+    admin: number;
+  };
+  inactive_users: number;
+  unverified_users: number;
+}
+
+// ============================================
+// STUDENT TYPES (Matches Students/models.py)
+// ============================================
+export interface Student {
+  id: number;
+  user: User;
+  full_name: string;
+  email: string;
+  phone: string;
+  student_id: string;
+  enrollment_date: string;
+  graduation_date: string | null;
+  is_graduated: boolean;
+  exams_completed: number;
+  certificates_earned: number;
+  total_score: number;
+  groups: number[];
+  assigned_evangelist: number | null;
+  status: 'active' | 'pending' | 'graduated' | 'completed';
+  progress: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StudentStats {
+  total: number;
+  active: number;
+  pending: number;
+  graduated: number;
+  average_progress: number;
+  top_students: Student[];
+}
+
+// ============================================
+// EVANGELIST TYPES (Matches Evangelists/models.py)
+// ============================================
+export interface Evangelist {
+  id: number;
+  user: User;
+  full_name: string;
+  email: string;
+  phone: string;
+  evangelist_id: string;
+  ordination_date: string | null;
+  years_of_service: number;
+  ministry_name: string;
+  ministry_focus: string;
+  total_students: number;
+  total_groups: number;
+  total_certificates_issued: number;
+  groups: number[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvangelistStats {
+  total: number;
+  active: number;
+  inactive: number;
+  top_evangelists: Evangelist[];
+}
+
+export interface EvangelistCreateData {
+  user_id: number;
+  ordination_date?: string;
+  years_of_service?: number;
+  ministry_name?: string;
+  ministry_focus?: string;
+}
+
+export interface EvangelistUpdateData {
+  ordination_date?: string;
+  years_of_service?: number;
+  ministry_name?: string;
+  ministry_focus?: string;
+}
+
+// ============================================
+// GROUP TYPES (Matches Groups/models.py)
+// ============================================
+export interface Group {
+  id: number;
+  name: string;
+  type: 'evangelist' | 'student' | 'mixed';
+  description: string;
+  leader: number | null;
+  leader_name: string;
+  members: User[];
+  member_count: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupCreateData {
+  name: string;
+  type: 'evangelist' | 'student' | 'mixed';
+  description?: string;
+  leader?: number | null;
+  members?: number[];
+  is_active?: boolean;
+}
+
+export interface GroupUpdateData {
+  name?: string;
+  type?: 'evangelist' | 'student' | 'mixed';
+  description?: string;
+  leader?: number | null;
+  members?: number[];
+  is_active?: boolean;
+}
+
+// ============================================
+// CERTIFICATE TYPES (Matches Certificates/models.py)
+// ============================================
+export interface Certificate {
+  id: number;
+  certificate_id: string;
+  certificate_number: string;
+  recipient: number;
+  recipient_name: string;
+  recipient_email: string;
+  recipient_phone: string;
+  heading: string;
+  position: string;
+  working_time: string;
+  logo_image: string;
+  person_image: string;
+  signature_person: string;
+  leader_signature: string;
+  additional_notes: string;
+  issue_date: string;
+  status: 'draft' | 'issued' | 'pending' | 'archived';
+  status_display: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CertificateStats {
+  total: number;
+  issued: number;
+  pending: number;
+  draft: number;
+  archived: number;
+}
+
+// ============================================
+// SERMON TYPES (Matches Sermons/models.py)
+// ============================================
+export interface Sermon {
+  id: number;
+  title: string;
+  topic: string;
+  author: number;
+  author_name: string;
+  content: string;
+  scripture: string;
+  questions: SermonQuestion[];
+  questions_count: number;
+  views: number;
+  likes: number;
+  shares: number;
+  status: 'draft' | 'published' | 'archived';
+  status_display: string;
+  created_at: string;
+  published_at: string | null;
+  updated_at: string;
+}
+
+export interface SermonQuestion {
+  id: string;
+  text: string;
+  type: 'short_answer' | 'long_answer' | 'checkbox' | 'radio' | 'true_false';
+  options?: string[];
+  correctAnswer?: string | string[];
+  required: boolean;
+  maxScore?: number;
+}
+
+export interface SermonStats {
+  total: number;
+  published: number;
+  draft: number;
+  archived: number;
+  total_views: number;
+  total_questions: number;
+}
+
+// ============================================
+// COMMENT TYPES (Matches Comments/models.py)
+// ============================================
+export interface Comment {
+  id: number;
+  sermon: number;
+  user: number;
+  user_name: string;
+  user_avatar: string | null;
+  content: string;
+  likes: number;
+  like_count: number;
+  reply_count: number;
+  is_liked: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  parent: number | null;
+  replies: Comment[];
+}
+
+export interface CommentStats {
+  total_comments: number;
+  top_comments: Comment[];
+}
+
+// ============================================
+// EVANGELISM TYPES
+// ============================================
+export interface EvangelismActivity {
+  id: number;
+  evangelist: number;
+  evangelist_name: string;
+  title: string;
+  description: string;
+  location: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  status: 'scheduled' | 'ongoing' | 'completed' | 'cancelled';
+  type: 'crusade' | 'street_evangelism' | 'home_visitation' | 'online' | 'other';
+  participants_count: number;
+  souls_won: number;
+  follow_up_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvangelismActivityStats {
+  total_activities: number;
+  scheduled: number;
+  ongoing: number;
+  completed: number;
+  cancelled: number;
+  total_participants: number;
+  total_souls_won: number;
+  total_follow_ups: number;
+}
+
+export interface SoulWinning {
+  id: number;
+  evangelist: number;
+  evangelist_name: string;
+  person_name: string;
+  phone_number: string;
+  email: string;
+  location: string;
+  date: string;
+  follow_up_date: string | null;
+  follow_up_status: 'pending' | 'contacted' | 'visited' | 'saved' | 'baptized' | 'discipled';
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SoulWinningStats {
+  total_souls: number;
+  pending_follow_up: number;
+  contacted: number;
+  visited: number;
+  saved: number;
+  baptized: number;
+  discipled: number;
+  weekly_target: number;
+  monthly_target: number;
+}
+
+export interface EvangelismReport {
+  id: number;
+  evangelist: number;
+  evangelist_name: string;
+  report_date: string;
+  souls_won: number;
+  follow_ups: number;
+  prayers_led: number;
+  bibles_given: number;
+  tracts_given: number;
+  testimonies: string;
+  challenges: string;
+  prayer_requests: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================
+// EXAM SUBMISSION TYPES (Sermon-based exams)
+// ============================================
+export interface ExamAnswer {
+  questionId: string;
+  answer: string | string[];
+  score: number;
+  maxScore: number;
+  feedback: string;
+}
+
+export interface ExamSubmission {
+  id: number;
+  sermon: number;
+  sermon_title: string;
+  student: number;
+  student_name: string;
+  student_email: string;
+  answers: ExamAnswer[];
+  total_score: number;
+  max_possible_score: number;
+  percentage: number;
+  is_passed: boolean;
+  status: 'pending' | 'graded' | 'reviewed';
+  status_display: string;
+  feedback: string;
+  graded_by: number | null;
+  graded_by_name: string | null;
+  graded_at: string | null;
+  time_taken: number;
+  submitted_at: string;
+  updated_at: string;
+  questions: SermonQuestion[];
+}
+
+export interface ExamFilterParams {
+  status?: 'all' | 'pending' | 'graded' | 'reviewed';
+  search?: string;
+  sermonId?: string;
+  studentId?: string;
+}
+
+export interface ExamStats {
+  total: number;
+  pending: number;
+  graded: number;
+  reviewed: number;
+  average_score: number;
+  passing_rate: number;
+}
+
+export interface ExamAnalytics {
+  total_submissions: number;
+  average_score: number;
+  passing_rate: number;
+  score_distribution: {
+    '0-20': number;
+    '21-40': number;
+    '41-60': number;
+    '61-80': number;
+    '81-100': number;
+  };
+  question_stats: Array<{
+    questionId: string;
+    text: string;
+    averageScore: number;
+    maxScore: number;
+    difficulty: 'easy' | 'medium' | 'hard';
+    submissionCount: number;
+  }>;
+  top_performers: ExamSubmission[];
+}
+
+
+
+
+export interface ApiResponse<T = any> {
+  data: T;
+  message?: string;
+  status?: string;
+  status_code?: number;
+  success?: boolean;
+  errors?: string[] | Record<string, string[]>;
+  pagination?: {
+    current_page: number;
+    total_pages: number;
+    total_items: number;
+    items_per_page: number;
+  };
+}
+
+
+
+// Add these to your src/types/data.ts file
+
+// ============================================
+// AUTHENTICATION TYPES
+// ============================================
+
+export interface LoginRequest {
+  phone_number?: string;
+  email?: string;
+  password: string;
+  // If using verification codes
+  code?: string;
+}
+
+export interface RegisterRequest {
+  full_name: string;
+  phone_number: string;
+  email: string;
+  country_code: string;
+  church_name?: string;
+  region: string;
+  city: string;
+  street?: string;
+  password?: string;
+  profile?: {
+    bio?: string;
+    profile_picture?: string | null;
+  };
+}
+
+export interface VerifyRequest {
+  phone_number: string;
+  code: string;
+}
+
+export interface AuthResponse {
+  access?: string;
+  refresh?: string;
+  user: User;
+  message?: string;
+  requires_verification?: boolean;
+  phone_number?: string;
+  verification_codes?: string[];
+  status?: string;
+  data?: {
+    access?: string;
+    refresh?: string;
+    user?: User;
+    message?: string;
+    requires_verification?: boolean;
+    phone_number?: string;
+  };
+}
+
+// Also add these if they're not already defined
+export interface LoginData {
+  username?: string;
+  email?: string;
+  phone_number?: string;
+  password: string;
+}
+
+export interface TokenResponse {
+  access: string;
+  refresh: string;
+}
+
+export interface RefreshTokenRequest {
+  refresh: string;
+}
+
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetConfirmRequest {
+  token: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+},  api.ts    // src/services/api.ts
+import axios from 'axios';
+import type { 
+  RegisterData, 
+  RegisterResponse, 
+  LoginResponse, 
+  VerifyResponse, 
+  User,
+  CheckUserCodesResponse,
+  GenerateLoginCodesResponse,
+  UserCRUD,
+  UserCreateData,
+  UserUpdateData,
+  BulkCreateData,
+  BulkCreateResponse,
+  FilterOptions,
+  UserStats,
+  Student,
+  StudentStats,
+  Evangelist,
+  EvangelistStats,
+  Group,
+  Certificate,
+  CertificateStats,
+  Sermon,
+  SermonStats,
+  Comment,
+  CommentStats,
+  EvangelismActivity,
+  EvangelismActivityStats,
+  SoulWinning,
+  SoulWinningStats,
+  EvangelismReport,
+  ExamFilterParams // ADD THIS IMPORT
+} from '../types/data';
+
+// ============================================
+// API CONFIGURATION
+// ============================================
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+  timeout: 30000,
+});
+
+// ============================================
+// REQUEST INTERCEPTOR
+// ============================================
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    console.error('Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// ============================================
+// RESPONSE INTERCEPTOR
+// ============================================
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+          const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
+            refresh: refreshToken,
+          });
+          
+          if (response.data.access) {
+            localStorage.setItem('access_token', response.data.access);
+            if (response.data.refresh) {
+              localStorage.setItem('refresh_token', response.data.refresh);
+            }
+            
+            originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
+            return api(originalRequest);
+          }
+        }
+      } catch (refreshError) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ============================================
+// AUTHENTICATION API
+// ============================================
+export const authAPI = {
+  register: (data: RegisterData) => api.post('/auth/register/', data),
+  login: (phoneNumber: string, code: string) => api.post('/auth/login/', { phone_number: phoneNumber, verification_code: code }),
+  checkUserCodes: (phoneNumber: string) => api.post('/auth/check-user-codes/', { phone_number: phoneNumber }),
+  generateLoginCodes: (phoneNumber: string) => api.post('/auth/generate-login-codes/', { phone_number: phoneNumber }),
+  verify: (phoneNumber: string, code: string) => api.post('/auth/verify/', { phone_number: phoneNumber, verification_code: code }),
+  resendVerification: (phoneNumber: string) => api.post('/auth/resend-verification/', { phone_number: phoneNumber }),
+  fetchVerificationCodes: (phoneNumber: string) => api.post('/auth/fetch-codes/', { phone_number: phoneNumber }),
+  getProfile: () => api.get('/auth/profile/'),
+  updateProfile: (data: any) => api.patch('/auth/profile/', data),
+  updateProfilePicture: (profilePicture: string) => api.post('/auth/profile/picture/', { profile_picture: profilePicture }),
+  logout: () => api.post('/auth/logout/'),
+  checkUser: (phoneNumber: string) => api.post('/auth/check-user/', { phone_number: phoneNumber }),
+  getAuthStats: () => api.get('/auth/stats/'),
+  getVerificationLogs: () => api.get('/auth/verification-logs/'),
+  getSessions: () => api.get('/auth/sessions/'),
+  getAuthLogs: () => api.get('/auth/auth-logs/'),
+};
+
+// ============================================
+// USER CRUD API
+// ============================================
+export const crudAPI = {
+  listUsers: (params?: any) => api.get('/auth/crud/users/', { params }),
+  getFilterOptions: () => api.get('/auth/crud/filters/'),
+  getUserStats: () => api.get('/auth/crud/stats/'),
+  getUser: (id: number) => api.get(`/auth/crud/users/${id}/`),
+  createUser: (data: UserCreateData) => api.post('/auth/crud/users/', data),
+  updateUser: (id: number, data: UserUpdateData) => api.patch(`/auth/crud/users/${id}/`, data),
+  replaceUser: (id: number, data: UserCreateData) => api.put(`/auth/crud/users/${id}/`, data),
+  deleteUser: (id: number) => api.delete(`/auth/crud/users/${id}/`),
+  hardDeleteUser: (id: number) => api.delete(`/auth/crud/users/${id}/hard-delete/`),
+  activateUser: (id: number) => api.post(`/auth/crud/users/${id}/activate/`),
+  deactivateUser: (id: number) => api.post(`/auth/crud/users/${id}/deactivate/`),
+  updateUserRole: (id: number, role: string) => api.patch(`/auth/crud/users/${id}/role/`, { role }),
+  bulkCreateUsers: (data: BulkCreateData) => api.post('/auth/crud/users/bulk/create/', data),
+  bulkDeleteUsers: (userIds: number[]) => api.delete('/auth/crud/users/bulk/delete/', { data: { user_ids: userIds } }),
+  bulkHardDeleteUsers: (userIds: number[]) => api.delete('/auth/crud/users/bulk/hard-delete/', { data: { user_ids: userIds } }),
+  bulkActivateUsers: (userIds: number[]) => api.post('/auth/crud/users/bulk/activate/', { user_ids: userIds }),
+  bulkDeactivateUsers: (userIds: number[]) => api.post('/auth/crud/users/bulk/deactivate/', { user_ids: userIds }),
+  bulkUpdateRoles: (updates: Array<{ id: number; role: string }>) => api.patch('/auth/crud/users/bulk/roles/', { updates }),
+};
+
+// ============================================
+// STUDENTS API
+// ============================================
+export const studentsAPI = {
+  list: (params?: any) => api.get('/students/', { params }),
+  create: (data: { user_id: number; assigned_evangelist?: number; groups?: number[] }) => api.post('/students/create/', data),
+  get: (id: number) => api.get(`/students/${id}/`),
+  update: (id: number, data: any) => api.patch(`/students/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/students/${id}/delete/`),
+  stats: () => api.get('/students/stats/'),
+  bulkDelete: (ids: number[]) => api.delete('/students/bulk-delete/', { data: { student_ids: ids } }),
+};
+
+// ============================================
+// EVANGELISTS API
+// ============================================
+export const evangelistsAPI = {
+  list: (params?: any) => api.get('/evangelists/', { params }),
+  create: (data: EvangelistCreateData) => api.post('/evangelists/create/', data),
+  get: (id: number) => api.get(`/evangelists/${id}/`),
+  update: (id: number, data: EvangelistUpdateData) => api.patch(`/evangelists/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/evangelists/${id}/delete/`),
+  stats: () => api.get('/evangelists/stats/'),
+};
+
+// ============================================
+// GROUPS API
+// ============================================
+export const groupsAPI = {
+  list: (params?: any) => api.get('/groups/', { params }),
+  create: (data: GroupCreateData) => api.post('/groups/create/', data),
+  get: (id: number) => api.get(`/groups/${id}/`),
+  update: (id: number, data: GroupUpdateData) => api.patch(`/groups/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/groups/${id}/delete/`),
+  addMember: (id: number, userId: number) => api.post(`/groups/${id}/add-member/`, { user_id: userId }),
+  removeMember: (id: number, userId: number) => api.delete(`/groups/${id}/remove-member/`, { data: { user_id: userId } }),
+};
+
+// ============================================
+// CERTIFICATES API
+// ============================================
+export const certificatesAPI = {
+  list: (params?: any) => api.get('/certificates/', { params }),
+  create: (data: any) => api.post('/certificates/create/', data),
+  get: (id: number) => api.get(`/certificates/${id}/`),
+  update: (id: number, data: any) => api.patch(`/certificates/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/certificates/${id}/delete/`),
+  issue: (id: number) => api.post(`/certificates/${id}/issue/`),
+  stats: () => api.get('/certificates/stats/'),
+};
+
+// ============================================
+// SERMONS API
+// ============================================
+export const sermonsAPI = {
+  list: (params?: any) => api.get('/sermons/', { params }),
+  create: (data: any) => api.post('/sermons/create/', data),
+  get: (id: number) => api.get(`/sermons/${id}/`),
+  update: (id: number, data: any) => api.patch(`/sermons/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/sermons/${id}/delete/`),
+  publish: (id: number) => api.post(`/sermons/${id}/publish/`),
+  stats: () => api.get('/sermons/stats/'),
+};
+
+// ============================================
+// COMMENTS API
+// ============================================
+export const commentsAPI = {
+  list: (sermonId: number) => api.get(`/comments/sermon/${sermonId}/`),
+  create: (sermonId: number, data: { content: string; parent?: number }) => api.post(`/comments/sermon/${sermonId}/create/`, data),
+  get: (id: number) => api.get(`/comments/${id}/`),
+  update: (id: number, data: { content: string }) => api.patch(`/comments/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/comments/${id}/delete/`),
+  like: (id: number) => api.post(`/comments/${id}/like/`),
+  stats: (sermonId: number) => api.get(`/comments/sermon/${sermonId}/stats/`),
+};
+
+// ============================================
+// EVANGELISM API
+// ============================================
+export const evangelismAPI = {
+  activities: {
+    list: (params?: any) => api.get('/evangelism/activities/', { params }),
+    create: (data: any) => api.post('/evangelism/activities/create/', data),
+    get: (id: number) => api.get(`/evangelism/activities/${id}/`),
+    update: (id: number, data: any) => api.patch(`/evangelism/activities/${id}/update/`, data),
+    delete: (id: number) => api.delete(`/evangelism/activities/${id}/delete/`),
+    stats: () => api.get('/evangelism/activities/stats/'),
+  },
+  souls: {
+    list: (params?: any) => api.get('/evangelism/souls/', { params }),
+    create: (data: any) => api.post('/evangelism/souls/create/', data),
+    get: (id: number) => api.get(`/evangelism/souls/${id}/`),
+    update: (id: number, data: any) => api.patch(`/evangelism/souls/${id}/update/`, data),
+    delete: (id: number) => api.delete(`/evangelism/souls/${id}/delete/`),
+    stats: () => api.get('/evangelism/souls/stats/'),
+  },
+  reports: {
+    list: (params?: any) => api.get('/evangelism/reports/', { params }),
+    create: (data: any) => api.post('/evangelism/reports/create/', data),
+    get: (id: number) => api.get(`/evangelism/reports/${id}/`),
+    update: (id: number, data: any) => api.patch(`/evangelism/reports/${id}/update/`, data),
+    delete: (id: number) => api.delete(`/evangelism/reports/${id}/delete/`),
+    stats: (params?: any) => api.get('/evangelism/reports/stats/', { params }),
+  },
+  dashboard: () => api.get('/evangelism/dashboard/'),
+};
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+export const setAuthTokens = (access: string, refresh?: string) => {
+  localStorage.setItem('access_token', access);
+  if (refresh) localStorage.setItem('refresh_token', refresh);
+};
+
+export const clearAuthTokens = () => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user');
+};
+
+export const isAuthenticated = (): boolean => !!localStorage.getItem('access_token');
+
+export const getCurrentUser = (): User | null => {
+  try {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const saveUser = (user: User) => localStorage.setItem('user', JSON.stringify(user));
+
+export const getAuthHeaders = () => {
+  const token = localStorage.getItem('access_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+
+
+
+
+// ============================================
+// EXAM SUBMISSION API (Sermon-based exams)
+// ============================================
+export const examAPI = {
+  // Submissions
+  listSubmissions: (params?: ExamFilterParams) => 
+    api.get('/exam/submissions/', { params }),
+  
+  getSubmission: (id: number) => 
+    api.get(`/exam/submissions/${id}/`),
+  
+  gradeSubmission: (id: number, data: { 
+    answers: { questionId: string; score: number; feedback: string }[]; 
+    feedback?: string 
+  }) => api.post(`/exam/submissions/${id}/grade/`, data),
+  
+  getSubmissionStats: (sermonId: number) => 
+    api.get(`/exam/sermon/${sermonId}/submissions/stats/`),
+  
+  getExamAnalytics: (sermonId: number) => 
+    api.get(`/exam/sermon/${sermonId}/analytics/`),
+  
+  getStudentExams: (studentId: number) => 
+    api.get(`/exam/student/?studentId=${studentId}`),
+  
+  // ========== NEW: Submit exam to backend ==========
+  submitExam: (sermonId: number, data: { 
+    answers: { questionId: string; answer: string | string[]; maxScore: number }[];
+    timeTaken: number;
+  }) => api.post(`/exam/sermon/${sermonId}/submit/`, data),
+  
+  // ========== NEW: Check if user has submitted ==========
+  checkSubmission: (sermonId: number, studentId: number) => 
+    api.get(`/exam/sermon/${sermonId}/check/?studentId=${studentId}`),
+};
+
+// ============================================
+// DEFAULT EXPORT
+// ============================================
+export default {
+  api,
+  authAPI,
+  crudAPI,
+  studentsAPI,
+  examAPI,
+  evangelistsAPI,
+  groupsAPI,
+  certificatesAPI,
+  sermonsAPI,
+  commentsAPI,
+  evangelismAPI,
+  setAuthTokens,
+  clearAuthTokens,
+  isAuthenticated,
+  getCurrentUser,
+  saveUser,
+  getAuthHeaders,
+};,   AdminContext.tsx   // src/context/AdminContext.tsx
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { 
+  studentsAPI, 
+  sermonsAPI, 
+  crudAPI, 
+  evangelistsAPI,
+  groupsAPI,
+  commentsAPI,
+  evangelismAPI,
+  examAPI
+} from '../../services/api';
+import type { 
+  Student, 
+  StudentStats, 
+  Sermon, 
+  SermonStats,
+  UserCRUD,
+  Evangelist,
+  EvangelistStats,
+  Group,
+  Comment,
+  CommentStats,
+  EvangelismActivity,
+  EvangelismActivityStats,
+  SoulWinning,
+  SoulWinningStats,
+  EvangelismReport,
+  ExamSubmission,
+  ExamFilterParams,
+  ExamStats,
+  ExamAnalytics
+} from '../../types/data';
+import toast from 'react-hot-toast';
+
+// ============================================
+// CONTEXT INTERFACE
+// ============================================
+interface AdminContextType {
+  // Users
+  users: UserCRUD[];
+  loadingUsers: boolean;
+  userError: string | null;
+  
+  // Students
+  students: Student[];
+  studentStats: StudentStats | null;
+  loadingStudents: boolean;
+  studentError: string | null;
+  
+  // Evangelists
+  evangelists: Evangelist[];
+  evangelistStats: EvangelistStats | null;
+  loadingEvangelists: boolean;
+  evangelistError: string | null;
+  
+  // Groups
+  groups: Group[];
+  loadingGroups: boolean;
+  groupError: string | null;
+  
+  // Sermons
+  sermons: Sermon[];
+  sermonStats: SermonStats | null;
+  loadingSermons: boolean;
+  sermonError: string | null;
+  
+  // Comments
+  comments: Comment[];
+  commentStats: CommentStats | null;
+  loadingComments: boolean;
+  commentError: string | null;
+  
+  // Evangelism
+  activities: EvangelismActivity[];
+  activityStats: EvangelismActivityStats | null;
+  souls: SoulWinning[];
+  soulStats: SoulWinningStats | null;
+  reports: EvangelismReport[];
+  loadingEvangelism: boolean;
+  evangelismError: string | null;
+  
+  // Exam Submissions
+  examSubmissions: ExamSubmission[];
+  examStats: ExamStats | null;
+  loadingExams: boolean;
+  examError: string | null;
+  
+  // Global Loading
+  loading: boolean;
+  
+  // User Functions
+  refreshUsers: () => Promise<void>;
+  deleteUser: (id: number) => Promise<void>;
+  activateUser: (id: number) => Promise<void>;
+  deactivateUser: (id: number) => Promise<void>;
+  
+  // Student Functions
+  refreshStudents: () => Promise<void>;
+  refreshStudentStats: () => Promise<void>;
+  refreshAllStudents: () => Promise<void>;
+  addStudent: (student: Student) => void;
+  updateStudent: (id: number, student: Student) => void;
+  deleteStudent: (id: number) => Promise<void>;
+  bulkDeleteStudents: (ids: number[]) => Promise<void>;
+  filterStudents: (searchQuery: string, statusFilter: string) => Student[];
+  getStudentStatsSummary: () => {
+    total: number;
+    active: number;
+    pending: number;
+    graduated: number;
+    averageProgress: number;
+  };
+  getStudentStatusBadge: (student: Student) => {
+    label: string;
+    className: string;
+    icon: React.ReactElement;
+  };
+  
+  // Evangelist Functions
+  refreshEvangelists: () => Promise<void>;
+  refreshEvangelistStats: () => Promise<void>;
+  refreshAllEvangelists: () => Promise<void>;
+  deleteEvangelist: (id: number) => Promise<void>;
+  
+  // Group Functions
+  refreshGroups: () => Promise<void>;
+  refreshAllGroups: () => Promise<void>;
+  addGroup: (group: Group) => void;
+  updateGroup: (id: number, group: Group) => void;
+  deleteGroup: (id: number) => Promise<void>;
+  addGroupMember: (groupId: number, userId: number) => Promise<void>;
+  removeGroupMember: (groupId: number, userId: number) => Promise<void>;
+  
+  // Sermon Functions
+  refreshSermons: () => Promise<void>;
+  refreshSermonStats: () => Promise<void>;
+  refreshAllSermons: () => Promise<void>;
+  addSermon: (sermon: Sermon) => void;
+  updateSermon: (id: number, sermon: Sermon) => void;
+  deleteSermon: (id: number) => Promise<void>;
+  publishSermon: (id: number) => Promise<void>;
+  filterSermons: (searchQuery: string, statusFilter: string, topicFilter: string) => Sermon[];
+  getSermonStatsSummary: () => {
+    total: number;
+    published: number;
+    draft: number;
+    archived: number;
+    totalViews: number;
+    totalQuestions: number;
+  };
+  getSermonStatusBadge: (sermon: Sermon) => {
+    label: string;
+    className: string;
+    icon: React.ReactElement;
+  };
+  
+  // Comment Functions
+  refreshComments: (sermonId: number) => Promise<void>;
+  refreshCommentStats: (sermonId: number) => Promise<void>;
+  addComment: (comment: Comment) => void;
+  deleteComment: (id: number) => Promise<void>;
+  likeComment: (id: number) => Promise<void>;
+  
+  // Evangelism Functions
+  refreshActivities: () => Promise<void>;
+  refreshSouls: () => Promise<void>;
+  refreshReports: () => Promise<void>;
+  refreshAllEvangelism: () => Promise<void>;
+  addActivity: (activity: EvangelismActivity) => void;
+  updateActivity: (id: number, activity: EvangelismActivity) => void;
+  deleteActivity: (id: number) => Promise<void>;
+  addSoul: (soul: SoulWinning) => void;
+  updateSoul: (id: number, soul: SoulWinning) => void;
+  deleteSoul: (id: number) => Promise<void>;
+  addReport: (report: EvangelismReport) => void;
+  updateReport: (id: number, report: EvangelismReport) => void;
+  deleteReport: (id: number) => Promise<void>;
+  
+  // Exam Functions
+  refreshExamSubmissions: (params?: ExamFilterParams) => Promise<void>;
+  getSubmission: (id: number) => Promise<ExamSubmission>;
+  gradeExamSubmission: (id: number, data: { answers: { questionId: string; score: number; feedback: string }[]; feedback?: string }) => Promise<ExamSubmission>;
+  getExamStats: (sermonId: number) => Promise<ExamStats>;
+  getExamAnalytics: (sermonId: number) => Promise<ExamAnalytics>;
+  getStudentExams: (studentId: number) => Promise<ExamSubmission[]>;
+  submitExam: (sermonId: number, data: { answers: { questionId: string; answer: string | string[]; maxScore: number }[]; timeTaken: number }) => Promise<any>;
+  checkSubmission: (sermonId: number, studentId: number) => Promise<boolean>;
+}
+
+// ============================================
+// CREATE CONTEXT
+// ============================================
+const AdminContext = createContext<AdminContextType | undefined>(undefined);
+
+export const useAdmin = () => {
+  const context = useContext(AdminContext);
+  if (!context) {
+    throw new Error('useAdmin must be used within an AdminProvider');
+  }
+  return context;
+};
+
+// ============================================
+// PROVIDER COMPONENT
+// ============================================
+interface AdminProviderProps {
+  children: React.ReactNode;
+}
+
+export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
+  // ============================================
+  // STATE DECLARATIONS
+  // ============================================
+  
+  // Users
+  const [users, setUsers] = useState<UserCRUD[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userError, setUserError] = useState<string | null>(null);
+
+  // Students
+  const [students, setStudents] = useState<Student[]>([]);
+  const [studentStats, setStudentStats] = useState<StudentStats | null>(null);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [studentError, setStudentError] = useState<string | null>(null);
+
+  // Evangelists
+  const [evangelists, setEvangelists] = useState<Evangelist[]>([]);
+  const [evangelistStats, setEvangelistStats] = useState<EvangelistStats | null>(null);
+  const [loadingEvangelists, setLoadingEvangelists] = useState(false);
+  const [evangelistError, setEvangelistError] = useState<string | null>(null);
+
+  // Groups
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
+
+  // Sermons
+  const [sermons, setSermons] = useState<Sermon[]>([]);
+  const [sermonStats, setSermonStats] = useState<SermonStats | null>(null);
+  const [loadingSermons, setLoadingSermons] = useState(false);
+  const [sermonError, setSermonError] = useState<string | null>(null);
+
+  // Comments
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentStats, setCommentStats] = useState<CommentStats | null>(null);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+
+  // Evangelism
+  const [activities, setActivities] = useState<EvangelismActivity[]>([]);
+  const [activityStats, setActivityStats] = useState<EvangelismActivityStats | null>(null);
+  const [souls, setSouls] = useState<SoulWinning[]>([]);
+  const [soulStats, setSoulStats] = useState<SoulWinningStats | null>(null);
+  const [reports, setReports] = useState<EvangelismReport[]>([]);
+  const [loadingEvangelism, setLoadingEvangelism] = useState(false);
+  const [evangelismError, setEvangelismError] = useState<string | null>(null);
+
+  // Exam Submissions
+  const [examSubmissions, setExamSubmissions] = useState<ExamSubmission[]>([]);
+  const [examStats, setExamStats] = useState<ExamStats | null>(null);
+  const [loadingExams, setLoadingExams] = useState(false);
+  const [examError, setExamError] = useState<string | null>(null);
+
+  // Global
+  const [loading, setLoading] = useState(true);
+
+  // ============================================
+  // USER FUNCTIONS
+  // ============================================
+  const refreshUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    setUserError(null);
+    try {
+      const response = await crudAPI.listUsers();
+      setUsers(response.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load users';
+      setUserError(message);
+      toast.error(message);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
+  const deleteUser = useCallback(async (id: number) => {
+    try {
+      await crudAPI.deleteUser(id);
+      await refreshUsers();
+      toast.success('User deleted successfully');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to delete user';
+      toast.error(message);
+      throw err;
+    }
+  }, [refreshUsers]);
+
+  const activateUser = useCallback(async (id: number) => {
+    try {
+      await crudAPI.activateUser(id);
+      await refreshUsers();
+      toast.success('User activated successfully');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to activate user';
+      toast.error(message);
+      throw err;
+    }
+  }, [refreshUsers]);
+
+  const deactivateUser = useCallback(async (id: number) => {
+    try {
+      await crudAPI.deactivateUser(id);
+      await refreshUsers();
+      toast.success('User deactivated successfully');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to deactivate user';
+      toast.error(message);
+      throw err;
+    }
+  }, [refreshUsers]);
+
+  // ============================================
+  // STUDENT FUNCTIONS
+  // ============================================
+  const refreshAllStudents = useCallback(async () => {
+    setLoadingStudents(true);
+    setStudentError(null);
+    try {
+      const [studentsRes, statsRes] = await Promise.all([
+        studentsAPI.list(),
+        studentsAPI.stats()
+      ]);
+      setStudents(studentsRes.data);
+      setStudentStats(statsRes.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load students';
+      setStudentError(message);
+      toast.error(message);
+    } finally {
+      setLoadingStudents(false);
+    }
+  }, []);
+
+  const refreshStudents = useCallback(async () => {
+    setLoadingStudents(true);
+    setStudentError(null);
+    try {
+      const response = await studentsAPI.list();
+      setStudents(response.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load students';
+      setStudentError(message);
+      toast.error(message);
+    } finally {
+      setLoadingStudents(false);
+    }
+  }, []);
+
+  const refreshStudentStats = useCallback(async () => {
+    try {
+      const response = await studentsAPI.stats();
+      setStudentStats(response.data);
+    } catch (err: any) {
+      console.error('Error fetching student stats:', err);
+    }
+  }, []);
+
+  const addStudent = (student: Student) => {
+    setStudents(prev => [student, ...prev]);
+    refreshStudentStats();
+  };
+
+  const updateStudent = (id: number, updatedStudent: Student) => {
+    setStudents(prev => prev.map(s => s.id === id ? updatedStudent : s));
+    refreshStudentStats();
+  };
+
+  const deleteStudent = useCallback(async (id: number) => {
+    try {
+      await studentsAPI.delete(id);
+      setStudents(prev => prev.filter(s => s.id !== id));
+      refreshStudentStats();
+      toast.success('Student deleted successfully');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to delete student';
+      toast.error(message);
+      throw err;
+    }
+  }, [refreshStudentStats]);
+
+  const bulkDeleteStudents = useCallback(async (ids: number[]) => {
+    if (ids.length === 0) {
+      toast.error('Please select at least one student');
+      return;
+    }
+    try {
+      await studentsAPI.bulkDelete(ids);
+      setStudents(prev => prev.filter(s => !ids.includes(s.id)));
+      refreshStudentStats();
+      toast.success(`${ids.length} student(s) deleted successfully`);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to delete students';
+      toast.error(message);
+      throw err;
+    }
+  }, [refreshStudentStats]);
+
+  const filterStudents = useCallback((searchQuery: string, statusFilter: string): Student[] => {
+    return students.filter(student => {
+      const matchesSearch = 
+        student.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        student.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        student.phone?.includes(searchQuery) ||
+        student.student_id?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || student.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [students]);
+
+  const getStudentStatsSummary = useCallback(() => {
+    if (!studentStats) {
+      return { total: 0, active: 0, pending: 0, graduated: 0, averageProgress: 0 };
+    }
+    return {
+      total: studentStats.total || 0,
+      active: studentStats.active || 0,
+      pending: studentStats.pending || 0,
+      graduated: studentStats.graduated || 0,
+      averageProgress: studentStats.average_progress || 0
+    };
+  }, [studentStats]);
+
+  const getStudentStatusBadge = useCallback((student: Student) => {
+    const statusMap: Record<string, { label: string; className: string; icon: React.ReactElement; }> = {
+      active: { label: 'Active', className: 'bg-green-100 text-green-700', icon: <span className="mr-1">+</span> },
+      pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-700', icon: <span className="mr-1">!</span> },
+      graduated: { label: 'Graduated', className: 'bg-blue-100 text-blue-700', icon: <span className="mr-1">*</span> },
+      completed: { label: 'Completed', className: 'bg-purple-100 text-purple-700', icon: <span className="mr-1">#</span> },
+    };
+    return statusMap[student.status] || statusMap.pending;
+  }, []);
+
+  // ============================================
+  // EVANGELIST FUNCTIONS
+  // ============================================
+  const refreshAllEvangelists = useCallback(async () => {
+    setLoadingEvangelists(true);
+    setEvangelistError(null);
+    try {
+      const [evangelistsRes, statsRes] = await Promise.all([
+        evangelistsAPI.list(),
+        evangelistsAPI.stats()
+      ]);
+      setEvangelists(evangelistsRes.data);
+      setEvangelistStats(statsRes.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load evangelists';
+      setEvangelistError(message);
+      toast.error(message);
+    } finally {
+      setLoadingEvangelists(false);
+    }
+  }, []);
+
+  const refreshEvangelists = useCallback(async () => {
+    setLoadingEvangelists(true);
+    setEvangelistError(null);
+    try {
+      const response = await evangelistsAPI.list();
+      setEvangelists(response.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load evangelists';
+      setEvangelistError(message);
+      toast.error(message);
+    } finally {
+      setLoadingEvangelists(false);
+    }
+  }, []);
+
+  const refreshEvangelistStats = useCallback(async () => {
+    try {
+      const response = await evangelistsAPI.stats();
+      setEvangelistStats(response.data);
+    } catch (err: any) {
+      console.error('Error fetching evangelist stats:', err);
+    }
+  }, []);
+
+  const deleteEvangelist = useCallback(async (id: number) => {
+    try {
+      await evangelistsAPI.delete(id);
+      setEvangelists(prev => prev.filter(e => e.id !== id));
+      refreshEvangelistStats();
+      toast.success('Evangelist deleted successfully');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to delete evangelist';
+      toast.error(message);
+      throw err;
+    }
+  }, [refreshEvangelistStats]);
+
+  // ============================================
+  // GROUP FUNCTIONS
+  // ============================================
+  const refreshAllGroups = useCallback(async () => {
+    setLoadingGroups(true);
+    setGroupError(null);
+    try {
+      const response = await groupsAPI.list();
+      setGroups(response.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load groups';
+      setGroupError(message);
+      toast.error(message);
+    } finally {
+      setLoadingGroups(false);
+    }
+  }, []);
+
+  const refreshGroups = useCallback(async () => {
+    setLoadingGroups(true);
+    setGroupError(null);
+    try {
+      const response = await groupsAPI.list();
+      setGroups(response.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load groups';
+      setGroupError(message);
+      toast.error(message);
+    } finally {
+      setLoadingGroups(false);
+    }
+  }, []);
+
+  const addGroup = (group: Group) => {
+    setGroups(prev => [group, ...prev]);
+  };
+
+  const updateGroup = (id: number, updatedGroup: Group) => {
+    setGroups(prev => prev.map(g => g.id === id ? updatedGroup : g));
+  };
+
+  const deleteGroup = useCallback(async (id: number) => {
+    try {
+      await groupsAPI.delete(id);
+      setGroups(prev => prev.filter(g => g.id !== id));
+      toast.success('Group deleted successfully');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to delete group';
+      toast.error(message);
+      throw err;
+    }
+  }, []);
+
+  const addGroupMember = useCallback(async (groupId: number, userId: number) => {
+    try {
+      await groupsAPI.addMember(groupId, userId);
+      await refreshAllGroups();
+      toast.success('Member added to group');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to add member';
+      toast.error(message);
+      throw err;
+    }
+  }, [refreshAllGroups]);
+
+  const removeGroupMember = useCallback(async (groupId: number, userId: number) => {
+    try {
+      await groupsAPI.removeMember(groupId, userId);
+      await refreshAllGroups();
+      toast.success('Member removed from group');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to remove member';
+      toast.error(message);
+      throw err;
+    }
+  }, [refreshAllGroups]);
+
+  // ============================================
+  // SERMON FUNCTIONS
+  // ============================================
+  const refreshAllSermons = useCallback(async () => {
+    setLoadingSermons(true);
+    setSermonError(null);
+    try {
+      const [sermonsRes, statsRes] = await Promise.all([
+        sermonsAPI.list(),
+        sermonsAPI.stats()
+      ]);
+      setSermons(sermonsRes.data);
+      setSermonStats(statsRes.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load sermons';
+      setSermonError(message);
+      toast.error(message);
+    } finally {
+      setLoadingSermons(false);
+    }
+  }, []);
+
+  const refreshSermons = useCallback(async () => {
+    setLoadingSermons(true);
+    setSermonError(null);
+    try {
+      const response = await sermonsAPI.list();
+      setSermons(response.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load sermons';
+      setSermonError(message);
+      toast.error(message);
+    } finally {
+      setLoadingSermons(false);
+    }
+  }, []);
+
+  const refreshSermonStats = useCallback(async () => {
+    try {
+      const response = await sermonsAPI.stats();
+      setSermonStats(response.data);
+    } catch (err: any) {
+      console.error('Error fetching sermon stats:', err);
+    }
+  }, []);
+
+  const addSermon = (sermon: Sermon) => {
+    setSermons(prev => [sermon, ...prev]);
+    refreshSermonStats();
+  };
+
+  const updateSermon = (id: number, updatedSermon: Sermon) => {
+    setSermons(prev => prev.map(s => s.id === id ? updatedSermon : s));
+    refreshSermonStats();
+  };
+
+  const deleteSermon = useCallback(async (id: number) => {
+    try {
+      await sermonsAPI.delete(id);
+      setSermons(prev => prev.filter(s => s.id !== id));
+      refreshSermonStats();
+      toast.success('Sermon deleted successfully');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to delete sermon';
+      toast.error(message);
+      throw err;
+    }
+  }, [refreshSermonStats]);
+
+  const publishSermon = useCallback(async (id: number) => {
+    try {
+      await sermonsAPI.publish(id);
+      await refreshSermons();
+      await refreshSermonStats();
+      toast.success('Sermon published successfully');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to publish sermon';
+      toast.error(message);
+      throw err;
+    }
+  }, [refreshSermons, refreshSermonStats]);
+
+  const filterSermons = useCallback((searchQuery: string, statusFilter: string, topicFilter: string): Sermon[] => {
+    return sermons.filter(sermon => {
+      const matchesSearch = 
+        sermon.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        sermon.topic?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        sermon.author_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        sermon.content?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || sermon.status === statusFilter;
+      const matchesTopic = topicFilter === 'all' || sermon.topic?.toLowerCase().includes(topicFilter.toLowerCase());
+      return matchesSearch && matchesStatus && matchesTopic;
+    });
+  }, [sermons]);
+
+  const getSermonStatsSummary = useCallback(() => {
+    if (!sermonStats) {
+      return { total: 0, published: 0, draft: 0, archived: 0, totalViews: 0, totalQuestions: 0 };
+    }
+    return {
+      total: sermonStats.total || 0,
+      published: sermonStats.published || 0,
+      draft: sermonStats.draft || 0,
+      archived: sermonStats.archived || 0,
+      totalViews: sermonStats.total_views || 0,
+      totalQuestions: sermonStats.total_questions || 0
+    };
+  }, [sermonStats]);
+
+  const getSermonStatusBadge = useCallback((sermon: Sermon) => {
+    const statusMap: Record<string, { label: string; className: string; icon: React.ReactElement; }> = {
+      published: { label: 'Published', className: 'bg-green-100 text-green-700', icon: <span className="mr-1">+</span> },
+      draft: { label: 'Draft', className: 'bg-yellow-100 text-yellow-700', icon: <span className="mr-1">!</span> },
+      archived: { label: 'Archived', className: 'bg-gray-100 text-gray-700', icon: <span className="mr-1">-</span> },
+    };
+    return statusMap[sermon.status] || statusMap.draft;
+  }, []);
+
+  // ============================================
+  // COMMENT FUNCTIONS
+  // ============================================
+  const refreshComments = useCallback(async (sermonId: number) => {
+    setLoadingComments(true);
+    setCommentError(null);
+    try {
+      const response = await commentsAPI.list(sermonId);
+      setComments(response.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load comments';
+      setCommentError(message);
+      toast.error(message);
+    } finally {
+      setLoadingComments(false);
+    }
+  }, []);
+
+  const refreshCommentStats = useCallback(async (sermonId: number) => {
+    try {
+      const response = await commentsAPI.stats(sermonId);
+      setCommentStats(response.data);
+    } catch (err: any) {
+      console.error('Error fetching comment stats:', err);
+    }
+  }, []);
+
+  const addComment = (comment: Comment) => {
+    setComments(prev => [comment, ...prev]);
+  };
+
+  const deleteComment = useCallback(async (id: number) => {
+    try {
+      await commentsAPI.delete(id);
+      setComments(prev => prev.filter(c => c.id !== id));
+      toast.success('Comment deleted successfully');
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to delete comment';
+      toast.error(message);
+      throw err;
+    }
+  }, []);
+
+  const likeComment = useCallback(async (id: number) => {
+    try {
+      const response = await commentsAPI.like(id);
+      setComments(prev => prev.map(c => {
+        if (c.id === id) {
+          return { ...c, likes: response.data.likes, is_liked: response.data.is_liked };
+        }
+        return c;
+      }));
+      return response.data;
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to like comment';
+      toast.error(message);
+      throw err;
+    }
+  }, []);
+
+  // ============================================
+  // EVANGELISM FUNCTIONS
+  // ============================================
+  const refreshActivities = useCallback(async () => {
+    try {
+      const response = await evangelismAPI.activities.list();
+      setActivities(response.data);
+    } catch (err: any) {
+      console.error('Error fetching activities:', err);
+    }
+  }, []);
+
+  const refreshSouls = useCallback(async () => {
+    try {
+      const response = await evangelismAPI.souls.list();
+      setSouls(response.data);
+    } catch (err: any) {
+      console.error('Error fetching souls:', err);
+    }
+  }, []);
+
+  const refreshReports = useCallback(async () => {
+    try {
+      const response = await evangelismAPI.reports.list();
+      setReports(response.data);
+    } catch (err: any) {
+      console.error('Error fetching reports:', err);
+    }
+  }, []);
+
+  const refreshAllEvangelism = useCallback(async () => {
+    setLoadingEvangelism(true);
+    setEvangelismError(null);
+    try {
+      const [activitiesRes, soulsRes, reportsRes, activityStatsRes, soulStatsRes] = await Promise.all([
+        evangelismAPI.activities.list(),
+        evangelismAPI.souls.list(),
+        evangelismAPI.reports.list(),
+        evangelismAPI.activities.stats(),
+        evangelismAPI.souls.stats(),
+      ]);
+      setActivities(activitiesRes.data);
+      setSouls(soulsRes.data);
+      setReports(reportsRes.data);
+      setActivityStats(activityStatsRes.data);
+      setSoulStats(soulStatsRes.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load evangelism data';
+      setEvangelismError(message);
+      toast.error(message);
+    } finally {
+      setLoadingEvangelism(false);
+    }
+  }, []);
+
+  const addActivity = (activity: EvangelismActivity) => {
+    setActivities(prev => [activity, ...prev]);
+  };
+
+  const updateActivity = (id: number, updatedActivity: EvangelismActivity) => {
+    setActivities(prev => prev.map(a => a.id === id ? updatedActivity : a));
+  };
+
+  const deleteActivity = useCallback(async (id: number) => {
+    await evangelismAPI.activities.delete(id);
+    setActivities(prev => prev.filter(a => a.id !== id));
+    toast.success('Activity deleted successfully');
+  }, []);
+
+  const addSoul = (soul: SoulWinning) => {
+    setSouls(prev => [soul, ...prev]);
+  };
+
+  const updateSoul = (id: number, updatedSoul: SoulWinning) => {
+    setSouls(prev => prev.map(s => s.id === id ? updatedSoul : s));
+  };
+
+  const deleteSoul = useCallback(async (id: number) => {
+    await evangelismAPI.souls.delete(id);
+    setSouls(prev => prev.filter(s => s.id !== id));
+    toast.success('Soul record deleted successfully');
+  }, []);
+
+  const addReport = (report: EvangelismReport) => {
+    setReports(prev => [report, ...prev]);
+  };
+
+  const updateReport = (id: number, updatedReport: EvangelismReport) => {
+    setReports(prev => prev.map(r => r.id === id ? updatedReport : r));
+  };
+
+  const deleteReport = useCallback(async (id: number) => {
+    await evangelismAPI.reports.delete(id);
+    setReports(prev => prev.filter(r => r.id !== id));
+    toast.success('Report deleted successfully');
+  }, []);
+
+  // ============================================
+  // EXAM FUNCTIONS - BACKEND INTEGRATION
+  // ============================================
+  
+  // Refresh exam submissions from backend
+  const refreshExamSubmissions = useCallback(async (params?: ExamFilterParams) => {
+    setLoadingExams(true);
+    setExamError(null);
+    try {
+      const response = await examAPI.listSubmissions(params);
+      setExamSubmissions(response.data.results || response.data);
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load exam submissions';
+      setExamError(message);
+      toast.error(message);
+    } finally {
+      setLoadingExams(false);
+    }
+  }, []);
+
+  // Get single submission
+  const getSubmission = useCallback(async (id: number): Promise<ExamSubmission> => {
+    try {
+      const response = await examAPI.getSubmission(id);
+      return response.data;
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to load submission';
+      toast.error(message);
+      throw err;
+    }
+  }, []);
+
+  // Grade a submission
+  const gradeExamSubmission = useCallback(async (id: number, data: { 
+    answers: { questionId: string; score: number; feedback: string }[]; 
+    feedback?: string 
+  }): Promise<ExamSubmission> => {
+    try {
+      const response = await examAPI.gradeSubmission(id, data);
+      toast.success('Exam graded successfully!');
+      return response.data;
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to grade exam';
+      toast.error(message);
+      throw err;
+    }
+  }, []);
+
+  // Get exam stats
+  const getExamStats = useCallback(async (sermonId: number): Promise<ExamStats> => {
+    try {
+      const response = await examAPI.getSubmissionStats(sermonId);
+      setExamStats(response.data);
+      return response.data;
+    } catch (err: any) {
+      console.error('Error fetching exam stats:', err);
+      toast.error('Failed to load exam stats');
+      throw err;
+    }
+  }, []);
+
+  // Get exam analytics
+  const getExamAnalytics = useCallback(async (sermonId: number): Promise<ExamAnalytics> => {
+    try {
+      const response = await examAPI.getExamAnalytics(sermonId);
+      return response.data;
+    } catch (err: any) {
+      console.error('Error fetching exam analytics:', err);
+      toast.error('Failed to load analytics');
+      throw err;
+    }
+  }, []);
+
+  // Get student exams
+  const getStudentExams = useCallback(async (studentId: number): Promise<ExamSubmission[]> => {
+    try {
+      const response = await examAPI.getStudentExams(studentId);
+      return response.data;
+    } catch (err: any) {
+      console.error('Error fetching student exams:', err);
+      toast.error('Failed to load student exams');
+      throw err;
+    }
+  }, []);
+
+  // ========== NEW: Submit exam to backend database ==========
+  const submitExam = useCallback(async (sermonId: number, data: { 
+    answers: { questionId: string; answer: string | string[]; maxScore: number }[];
+    timeTaken: number;
+  }): Promise<any> => {
+    try {
+      const response = await examAPI.submitExam(sermonId, data);
+      toast.success('Exam submitted successfully!');
+      return response.data;
+    } catch (err: any) {
+      const message = err.response?.data?.error || 'Failed to submit exam';
+      toast.error(message);
+      throw err;
+    }
+  }, []);
+
+  // ========== NEW: Check if user has submitted ==========
+  const checkSubmission = useCallback(async (sermonId: number, studentId: number): Promise<boolean> => {
+    try {
+      const response = await examAPI.checkSubmission(sermonId, studentId);
+      return response.data.submitted || false;
+    } catch (err: any) {
+      console.error('Error checking submission:', err);
+      return false;
+    }
+  }, []);
+
+  // ============================================
+  // INITIAL LOAD
+  // ============================================
+  useEffect(() => {
+    const loadAll = async () => {
+      setLoading(true);
+      await Promise.all([
+        refreshAllStudents(),
+        refreshAllEvangelists(),
+        refreshAllGroups(),
+        refreshAllSermons(),
+        refreshAllEvangelism(),
+        refreshUsers(),
+        refreshExamSubmissions()
+      ]);
+      setLoading(false);
+    };
+    loadAll();
+  }, []);
+
+  // ============================================
+  // CONTEXT VALUE
+  // ============================================
+  const value: AdminContextType = {
+    // Users
+    users,
+    loadingUsers,
+    userError,
+    
+    // Students
+    students,
+    studentStats,
+    loadingStudents,
+    studentError,
+    
+    // Evangelists
+    evangelists,
+    evangelistStats,
+    loadingEvangelists,
+    evangelistError,
+    
+    // Groups
+    groups,
+    loadingGroups,
+    groupError,
+    
+    // Sermons
+    sermons,
+    sermonStats,
+    loadingSermons,
+    sermonError,
+    
+    // Comments
+    comments,
+    commentStats,
+    loadingComments,
+    commentError,
+    
+    // Evangelism
+    activities,
+    activityStats,
+    souls,
+    soulStats,
+    reports,
+    loadingEvangelism,
+    evangelismError,
+    
+    // Exam Submissions
+    examSubmissions,
+    examStats,
+    loadingExams,
+    examError,
+    
+    // Global
+    loading,
+    
+    // User Functions
+    refreshUsers,
+    deleteUser,
+    activateUser,
+    deactivateUser,
+    
+    // Student Functions
+    refreshStudents,
+    refreshStudentStats,
+    refreshAllStudents,
+    addStudent,
+    updateStudent,
+    deleteStudent,
+    bulkDeleteStudents,
+    filterStudents,
+    getStudentStatsSummary,
+    getStudentStatusBadge,
+    
+    // Evangelist Functions
+    refreshEvangelists,
+    refreshEvangelistStats,
+    refreshAllEvangelists,
+    deleteEvangelist,
+    
+    // Group Functions
+    refreshGroups,
+    refreshAllGroups,
+    addGroup,
+    updateGroup,
+    deleteGroup,
+    addGroupMember,
+    removeGroupMember,
+    
+    // Sermon Functions
+    refreshSermons,
+    refreshSermonStats,
+    refreshAllSermons,
+    addSermon,
+    updateSermon,
+    deleteSermon,
+    publishSermon,
+    filterSermons,
+    getSermonStatsSummary,
+    getSermonStatusBadge,
+    
+    // Comment Functions
+    refreshComments,
+    refreshCommentStats,
+    addComment,
+    deleteComment,
+    likeComment,
+    
+    // Evangelism Functions
+    refreshActivities,
+    refreshSouls,
+    refreshReports,
+    refreshAllEvangelism,
+    addActivity,
+    updateActivity,
+    deleteActivity,
+    addSoul,
+    updateSoul,
+    deleteSoul,
+    addReport,
+    updateReport,
+    deleteReport,
+    
+    // Exam Functions
+    refreshExamSubmissions,
+    getSubmission,
+    gradeExamSubmission,
+    getExamStats,
+    getExamAnalytics,
+    getStudentExams,
+    submitExam,
+    checkSubmission,
+  };
+
+  return (
+    <AdminContext.Provider value={value}>
+      {children}
+    </AdminContext.Provider>
+  );
+};,    // src/pages/admin/GroupsManagement.tsx
+import React, { useState } from 'react';
+import { 
+  FaSearch, FaPlus, FaEye, FaEdit, FaTrash, FaUsers, 
+  FaUserGraduate, FaChurch, FaFilter, FaArrowLeft, 
+  FaSpinner, FaTimesCircle, FaCheckCircle, FaSync,
+  FaUserTie, FaCalendar, FaUserPlus, FaUserMinus,
+  FaEnvelope, FaPhone, FaExclamationTriangle
+} from 'react-icons/fa';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAdmin } from '../../auth/context/AdminContext';
+import { groupsAPI } from '../../services/api';
+import type { Group, User } from '../../types/data';
+import toast from 'react-hot-toast';
+
+// ============================================
+// CONFIRMATION MODAL
+// ============================================
+interface ConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  type?: 'danger' | 'warning' | 'info' | 'success';
+  isLoading?: boolean;
+}
+
+const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  type = 'warning',
+  isLoading = false
+}) => {
+  if (!isOpen) return null;
+
+  const getTypeStyles = () => {
+    switch(type) {
+      case 'danger':
+        return {
+          icon: <FaExclamationTriangle className="text-red-600 text-4xl" />,
+          button: 'bg-red-600 hover:bg-red-700 text-white',
+          border: 'border-red-200'
+        };
+      case 'warning':
+        return {
+          icon: <FaExclamationTriangle className="text-yellow-600 text-4xl" />,
+          button: 'bg-yellow-600 hover:bg-yellow-700 text-white',
+          border: 'border-yellow-200'
+        };
+      case 'success':
+        return {
+          icon: <FaCheckCircle className="text-green-600 text-4xl" />,
+          button: 'bg-green-600 hover:bg-green-700 text-white',
+          border: 'border-green-200'
+        };
+      default:
+        return {
+          icon: <FaExclamationTriangle className="text-blue-600 text-4xl" />,
+          button: 'bg-blue-600 hover:bg-blue-700 text-white',
+          border: 'border-blue-200'
+        };
+    }
+  };
+
+  const styles = getTypeStyles();
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+        <div className={`p-6 border-b ${styles.border}`}>
+          <div className="flex items-center space-x-4">
+            <div className="flex-shrink-0">
+              {styles.icon}
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+              <p className="text-sm text-gray-600 mt-1">{message}</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-6 bg-gray-50 flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            disabled={isLoading}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-50"
+          >
+            {cancelText}
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isLoading}
+            className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50 flex items-center ${styles.button}`}
+          >
+            {isLoading ? (
+              <>
+                <FaSpinner className="animate-spin mr-2" />
+                Processing...
+              </>
+            ) : (
+              confirmText
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// VIEW GROUP MEMBERS MODAL
+// ============================================
+interface ViewMembersModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  group: Group | null;
+  onRemoveMember: (groupId: number, userId: number, userName: string) => void;
+}
+
+const ViewMembersModal: React.FC<ViewMembersModalProps> = ({
+  isOpen,
+  onClose,
+  group,
+  onRemoveMember
+}) => {
+  if (!isOpen || !group) return null;
+
+ 
+
+  const getInitials = (name: string) => {
+    return name?.charAt(0).toUpperCase() || 'U';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-cyan-50 to-blue-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <FaUsers className="text-cyan-600 text-2xl" />
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Group Members</h3>
+                <p className="text-sm text-gray-600">
+                  {group.name} - {group.members?.length || 0} members
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <FaTimesCircle />
+            </button>
+          </div>
+        </div>
+
+        {/* Members List */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+          {!group.members || group.members.length === 0 ? (
+            <div className="text-center py-12">
+              <FaUsers className="text-5xl text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">No members in this group</p>
+              <p className="text-sm text-gray-400">Add members using the "Add Member" button</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {group.members.map((member: User) => (
+                <div key={member.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200 hover:bg-white hover:shadow-md transition-all">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
+                      {getInitials(member.full_name || member.phone_number)}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">{member.full_name || 'Unknown'}</p>
+                      <p className="text-xs text-gray-500 flex items-center">
+                        <FaEnvelope className="mr-1" /> {member.email || 'No email'}
+                      </p>
+                      <p className="text-xs text-gray-500 flex items-center">
+                        <FaPhone className="mr-1" /> {member.phone_number || 'No phone'}
+                      </p>
+                      <p className="text-xs text-gray-400">Role: {member.role || 'User'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {member.is_online ? (
+                      <span className="text-xs text-green-600 flex items-center">
+                        <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                        Online
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">Offline</span>
+                    )}
+                    <button
+                      onClick={() => onRemoveMember(group.id, member.id, member.full_name || member.phone_number)}
+                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Remove member"
+                    >
+                      <FaUserMinus />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Member Stats */}
+          <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-2xl font-bold text-cyan-600">{group.members?.length || 0}</p>
+                <p className="text-xs text-gray-500">Total Members</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-green-600">
+                  {group.members?.filter(m => m.is_online).length || 0}
+                </p>
+                <p className="text-xs text-gray-500">Online</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-blue-600">
+                  {group.members?.filter(m => m.is_verified).length || 0}
+                </p>
+                <p className="text-xs text-gray-500">Verified</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+const GroupsManagement: React.FC = () => {
+  const navigate = useNavigate();
+  const { 
+    groups, 
+    loadingGroups, 
+    groupError,
+    refreshAllGroups,
+    deleteGroup,
+    addGroupMember,
+    removeGroupMember,
+    students,
+    refreshAllStudents
+  } = useAdmin();
+  
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filterType, setFilterType] = useState<'all' | 'evangelist' | 'student' | 'mixed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [selectedGroups] = useState<number[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // ========== VIEW MEMBERS MODAL STATE ==========
+  const [showViewMembersModal, setShowViewMembersModal] = useState(false);
+  const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<Group | null>(null);
+  
+  // ========== CONFIRMATION MODAL STATE ==========
+  const [confirmationModal, setConfirmationModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: '',
+    type: 'warning' as 'danger' | 'warning' | 'info' | 'success',
+    onConfirm: () => {},
+  });
+
+  // ========== ADD MEMBER STATE ==========
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [selectedGroupName, setSelectedGroupName] = useState<string>('');
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedStudentName, setSelectedStudentName] = useState<string>('');
+  const [isAddingMember, setIsAddingMember] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+
+  // Filter groups
+  const filteredGroups = groups.filter(group => {
+    const matchesSearch = 
+      group.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      group.leader_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      group.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesType = filterType === 'all' || group.type === filterType;
+    const matchesStatus = filterStatus === 'all' || 
+      (filterStatus === 'active' && group.is_active) ||
+      (filterStatus === 'inactive' && !group.is_active);
+    
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  // Filter students for member selection
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = 
+      student.full_name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+      student.email?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+      student.phone?.includes(memberSearchQuery) ||
+      student.student_id?.toLowerCase().includes(memberSearchQuery.toLowerCase());
+    return matchesSearch;
+  });
+
+  // Stats
+  const stats = {
+    total: groups.length,
+    evangelist: groups.filter(g => g.type === 'evangelist').length,
+    student: groups.filter(g => g.type === 'student').length,
+    mixed: groups.filter(g => g.type === 'mixed').length,
+    active: groups.filter(g => g.is_active).length,
+    inactive: groups.filter(g => !g.is_active).length,
+  };
+
+  // ========== HANDLERS ==========
+  const handleDelete = (id: number, name: string) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Delete Group',
+      message: `Are you sure you want to delete the group "${name}"? This action cannot be undone.`,
+      confirmText: 'Delete Group',
+      type: 'danger',
+      onConfirm: async () => {
+        setIsDeleting(true);
+        try {
+          await deleteGroup(id);
+          toast.success(`Group "${name}" deleted successfully`);
+          refreshAllGroups();
+        } catch (error: any) {
+          toast.error(error.response?.data?.error || 'Failed to delete group');
+        } finally {
+          setIsDeleting(false);
+          setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedGroups.length === 0) {
+      toast.error('Please select at least one group');
+      return;
+    }
+    
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Bulk Delete Groups',
+      message: `Are you sure you want to delete ${selectedGroups.length} group(s)? This action cannot be undone.`,
+      confirmText: `Delete ${selectedGroups.length} Groups`,
+      type: 'danger',
+      onConfirm: async () => {
+        setIsBulkDeleting(true);
+        try {
+          for (const id of selectedGroups) {
+            await deleteGroup(id);
+          }
+          toast.success(`${selectedGroups.length} group(s) deleted successfully`);
+          refreshAllGroups();
+        } catch (error: any) {
+          toast.error(error.response?.data?.error || 'Failed to delete groups');
+        } finally {
+          setIsBulkDeleting(false);
+          setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleRefresh = () => {
+    refreshAllGroups();
+    if (refreshAllStudents) {
+      refreshAllStudents();
+    }
+    toast.success('Refreshed!');
+  };
+
+  const handleViewMembers = (group: Group) => {
+    setSelectedGroupForMembers(group);
+    setShowViewMembersModal(true);
+  };
+
+  // ========== ADD MEMBER HANDLERS ==========
+  const handleOpenAddMemberModal = (groupId: number, groupName: string) => {
+    setSelectedGroupId(groupId);
+    setSelectedGroupName(groupName);
+    setSelectedUserId(null);
+    setSelectedStudentName('');
+    setMemberSearchQuery('');
+    setShowAddMemberModal(true);
+  };
+
+  const handleCloseAddMemberModal = () => {
+    setShowAddMemberModal(false);
+    setSelectedGroupId(null);
+    setSelectedGroupName('');
+    setSelectedUserId(null);
+    setSelectedStudentName('');
+    setMemberSearchQuery('');
+  };
+
+  const handleSelectStudent = (studentId: number, studentName: string) => {
+    setSelectedUserId(studentId);
+    setSelectedStudentName(studentName);
+  };
+
+  // This function opens the confirmation modal
+  const handleAddMemberClick = () => {
+    if (!selectedUserId) {
+      toast.error('Please select a student to add');
+      return;
+    }
+
+    // Open confirmation modal
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Add Member to Group',
+      message: `Are you sure you want to add "${selectedStudentName}" to "${selectedGroupName}"?`,
+      confirmText: 'Add Member',
+      type: 'success',
+      onConfirm: handleConfirmAddMember
+    });
+  };
+
+  // This function executes the actual add member operation
+  const handleConfirmAddMember = async () => {
+    if (!selectedGroupId || !selectedUserId) {
+      toast.error('Missing group or student information');
+      setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+      return;
+    }
+
+    setIsAddingMember(true);
+    try {
+      await addGroupMember(selectedGroupId, selectedUserId);
+      toast.success(`${selectedStudentName} added to group successfully`);
+      
+      // Close both modals
+      setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+      handleCloseAddMemberModal();
+      
+      // Refresh data
+      refreshAllGroups();
+      
+      // Refresh the group to show updated members
+      const updatedGroup = await groupsAPI.get(selectedGroupId);
+      setSelectedGroupForMembers(updatedGroup.data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to add member');
+      setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
+
+  const handleRemoveMember = (groupId: number, userId: number, userName: string) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Remove Member',
+      message: `Are you sure you want to remove "${userName}" from this group?`,
+      confirmText: 'Remove Member',
+      type: 'warning',
+      onConfirm: async () => {
+        try {
+          await removeGroupMember(groupId, userId);
+          toast.success(`${userName} removed from group`);
+          refreshAllGroups();
+          // Refresh the group to show updated members
+          const updatedGroup = await groupsAPI.get(groupId);
+          setSelectedGroupForMembers(updatedGroup.data);
+        } catch (error: any) {
+          toast.error(error.response?.data?.error || 'Failed to remove member');
+        } finally {
+          setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  // ========== HELPERS ==========
+  const getTypeIcon = (type: string) => {
+    switch(type) {
+      case 'evangelist':
+        return <FaChurch className="text-cyan-600" />;
+      case 'student':
+        return <FaUserGraduate className="text-cyan-600" />;
+      case 'mixed':
+        return <FaUsers className="text-cyan-600" />;
+      default:
+        return <FaUsers className="text-cyan-600" />;
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch(type) {
+      case 'evangelist':
+        return 'Evangelist';
+      case 'student':
+        return 'Student';
+      case 'mixed':
+        return 'Mixed';
+      default:
+        return type;
+    }
+  };
+
+  const getStatusBadge = (group: Group) => {
+    if (group.is_active) {
+      return { label: 'Active', className: 'bg-green-100 text-green-700', icon: <FaCheckCircle className="mr-1" /> };
+    }
+    return { label: 'Inactive', className: 'bg-red-100 text-red-700', icon: <FaTimesCircle className="mr-1" /> };
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString();
+  };
+
+  // ========== RENDER ==========
+  if (loadingGroups && groups.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-4xl text-cyan-500 mx-auto mb-4" />
+          <p className="text-gray-500">Loading groups...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (groupError && groups.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaTimesCircle className="text-4xl text-red-500" />
+          </div>
+          <p className="text-gray-700 font-medium">Failed to load groups</p>
+          <p className="text-sm text-gray-400 mt-1">{groupError}</p>
+          <button
+            onClick={handleRefresh}
+            className="mt-4 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors flex items-center mx-auto"
+          >
+            <FaSync className="mr-2" />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={() => setConfirmationModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmationModal.onConfirm}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        confirmText={confirmationModal.confirmText}
+        type={confirmationModal.type}
+        isLoading={isDeleting || isBulkDeleting || isAddingMember}
+      />
+
+      {/* View Members Modal */}
+      <ViewMembersModal
+        isOpen={showViewMembersModal}
+        onClose={() => {
+          setShowViewMembersModal(false);
+          setSelectedGroupForMembers(null);
+        }}
+        group={selectedGroupForMembers}
+        onRemoveMember={handleRemoveMember}
+      />
+
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => navigate('/admin')}
+            className="p-2 hover:bg-cyan-50 rounded-lg transition-colors group"
+            title="Back to Dashboard"
+          >
+            <FaArrowLeft className="text-gray-500 group-hover:text-cyan-600 transition-colors" />
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Groups Management</h2>
+            <p className="text-sm text-gray-600">Manage all evangelist and student groups</p>
+            <p className="text-xs text-gray-400 mt-1">{groups.length} groups found</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleRefresh}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center space-x-2"
+          >
+            <FaSync className={loadingGroups ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
+          <Link 
+            to="/admin/create-group" 
+            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
+          >
+            <FaPlus />
+            <span>Create Group</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-cyan-500">
+          <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+          <p className="text-xs text-gray-500">Total Groups</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-blue-500">
+          <p className="text-2xl font-bold text-blue-600">{stats.evangelist}</p>
+          <p className="text-xs text-gray-500">Evangelist</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-green-500">
+          <p className="text-2xl font-bold text-green-600">{stats.student}</p>
+          <p className="text-xs text-gray-500">Student</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-purple-500">
+          <p className="text-2xl font-bold text-purple-600">{stats.mixed}</p>
+          <p className="text-xs text-gray-500">Mixed</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-green-500">
+          <p className="text-2xl font-bold text-green-600">{stats.active}</p>
+          <p className="text-xs text-gray-500">Active</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-red-500">
+          <p className="text-2xl font-bold text-red-600">{stats.inactive}</p>
+          <p className="text-xs text-gray-500">Inactive</p>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="bg-white rounded-xl shadow-md p-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search groups by name, leader or description..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
+                showFilters ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <FaFilter />
+              <span>Filters</span>
+            </button>
+            {selectedGroups.length > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                disabled={isBulkDeleting}
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-all flex items-center space-x-2 disabled:opacity-50"
+              >
+                {isBulkDeleting ? <FaSpinner className="animate-spin" /> : <FaTrash />}
+                <span>Delete ({selectedGroups.length})</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="all">All Types</option>
+                  <option value="evangelist">Evangelist</option>
+                  <option value="student">Student</option>
+                  <option value="mixed">Mixed</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="all">All</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={() => {
+                  setFilterType('all');
+                  setFilterStatus('all');
+                  setSearchQuery('');
+                }}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Groups Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filteredGroups.map((group) => {
+          const status = getStatusBadge(group);
+          return (
+            <div key={group.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-6 border-l-4 border-cyan-500">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2">
+                    {getTypeIcon(group.type)}
+                    <h4 className="text-lg font-semibold text-gray-900">{group.name}</h4>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">{group.description || 'No description'}</p>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm">
+                    <span className="flex items-center text-gray-600">
+                      <FaUsers className="mr-1 text-cyan-500" />
+                      {group.member_count || 0} members
+                    </span>
+                    <span className="text-gray-300">•</span>
+                    <span className="text-gray-600 flex items-center">
+                      <FaUserTie className="mr-1 text-cyan-500" />
+                      Leader: <span className="font-medium text-gray-800 ml-1">{group.leader_name || 'N/A'}</span>
+                    </span>
+                    <span className="text-gray-300">•</span>
+                    <span className="text-gray-600 flex items-center">
+                      <FaCalendar className="mr-1 text-gray-400" />
+                      {formatDate(group.created_at)}
+                    </span>
+                  </div>
+                  
+                  {/* Member Count Badge */}
+                  <div className="mt-2 flex items-center space-x-2">
+                    <span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">
+                      {group.member_count || 0} members
+                    </span>
+                    {group.members && group.members.length > 0 && (
+                      <span className="text-xs text-gray-500">
+                        {group.members.filter(m => m.is_online).length} online
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Members Preview */}
+                  {group.members && group.members.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {group.members.slice(0, 5).map((member) => (
+                        <div key={member.id} className="flex items-center">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium text-white ${
+                            member.is_online ? 'bg-green-500' : 'bg-gray-400'
+                          }`}>
+                            {member.full_name?.charAt(0).toUpperCase() || 'U'}
+                          </div>
+                          {member.is_online && (
+                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full ml-0.5"></span>
+                          )}
+                        </div>
+                      ))}
+                      {group.members.length > 5 && (
+                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
+                          +{group.members.length - 5}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <span className={`px-2.5 py-1 text-xs font-medium rounded-full inline-flex items-center ${status.className}`}>
+                  {status.icon}
+                  {status.label}
+                </span>
+              </div>
+              <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-100">
+                <span className="text-xs text-gray-500 capitalize">
+                  Type: <span className="font-medium">{getTypeLabel(group.type)}</span>
+                </span>
+                <div className="flex space-x-1">
+                  <button
+                    onClick={() => handleViewMembers(group)}
+                    className="p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
+                    title="View Members"
+                  >
+                    <FaUsers />
+                  </button>
+                  <button
+                    onClick={() => handleOpenAddMemberModal(group.id, group.name)}
+                    className="p-2 text-gray-500 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50"
+                    title="Add Member"
+                  >
+                    <FaUserPlus />
+                  </button>
+                  <Link 
+                    to={`/admin/groups/${group.id}`} 
+                    className="p-2 text-gray-500 hover:text-cyan-600 transition-colors rounded-lg hover:bg-cyan-50"
+                    title="View Group"
+                  >
+                    <FaEye />
+                  </Link>
+                  <Link 
+                    to={`/admin/groups/edit/${group.id}`} 
+                    className="p-2 text-gray-500 hover:text-cyan-600 transition-colors rounded-lg hover:bg-cyan-50"
+                    title="Edit Group"
+                  >
+                    <FaEdit />
+                  </Link>
+                  <button 
+                    onClick={() => handleDelete(group.id, group.name)} 
+                    disabled={isDeleting}
+                    className="p-2 text-gray-500 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 disabled:opacity-50"
+                    title="Delete Group"
+                  >
+                    <FaTrash />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Empty State */}
+      {filteredGroups.length === 0 && (
+        <div className="text-center py-16 bg-white rounded-xl shadow-md">
+          <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaUsers className="text-4xl text-cyan-400" />
+          </div>
+          <p className="text-gray-500 font-medium">No groups found</p>
+          <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filter</p>
+          <Link 
+            to="/admin/create-group" 
+            className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium"
+          >
+            <FaPlus className="mr-2" />
+            Create your first group
+          </Link>
+        </div>
+      )}
+
+      {/* Add Member Modal */}
+      {showAddMemberModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-900">Add Member to Group</h3>
+                <button
+                  onClick={handleCloseAddMemberModal}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <FaTimesCircle />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">Add a student to <strong>{selectedGroupName}</strong></p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Search Students */}
+              <div className="relative">
+                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search students by name, email or ID..."
+                  value={memberSearchQuery}
+                  onChange={(e) => setMemberSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Students List */}
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {filteredStudents.length === 0 ? (
+                  <p className="text-center text-gray-500 py-4">No students found</p>
+                ) : (
+                  filteredStudents.map((student) => (
+                    <div
+                      key={student.id}
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                        selectedUserId === student.id
+                          ? 'border-cyan-500 bg-cyan-50'
+                          : 'border-gray-200 hover:border-cyan-300 hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleSelectStudent(student.id, student.full_name)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900">{student.full_name}</p>
+                          <p className="text-xs text-gray-500 flex items-center">
+                            <FaEnvelope className="mr-1" /> {student.email}
+                          </p>
+                          <p className="text-xs text-gray-500 flex items-center">
+                            <FaPhone className="mr-1" /> {student.phone}
+                          </p>
+                          <p className="text-xs text-gray-400">ID: {student.student_id}</p>
+                        </div>
+                        {selectedUserId === student.id && (
+                          <FaCheckCircle className="text-cyan-500 text-xl" />
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={handleCloseAddMemberModal}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddMemberClick}
+                disabled={!selectedUserId || isAddingMember}
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
+              >
+                <FaUserPlus className="mr-2" />
+                Add Member
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer Info */}
+      {filteredGroups.length > 0 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500 bg-white rounded-xl shadow-md px-6 py-3">
+          <span>Showing {filteredGroups.length} of {groups.length} groups</span>
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="flex items-center">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
+              Evangelist: {stats.evangelist}
+            </span>
+            <span className="flex items-center">
+              <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+              Student: {stats.student}
+            </span>
+            <span className="flex items-center">
+              <span className="w-2 h-2 bg-purple-500 rounded-full mr-1"></span>
+              Mixed: {stats.mixed}
+            </span>
+            <span className="flex items-center">
+              <span className="w-2 h-2 bg-green-600 rounded-full mr-1"></span>
+              Active: {stats.active}
+            </span>
+            <span className="flex items-center">
+              <span className="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
+              Inactive: {stats.inactive}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default GroupsManagement;,     why  it   does  not   add  more  than  one  member?  in  oe  grpoup?  solve  the problem  by   determinig  the  problem  first  then solving

@@ -7,17 +7,13 @@ import {
   FaEdit, 
   FaTrash, 
   FaBook, 
-  FaClock, 
   FaUsers, 
   FaArrowLeft, 
   FaCheckCircle, 
-  FaPencilAlt, 
-  FaArchive, 
   FaSpinner, 
   FaFilter, 
   FaSync,
   FaComments,
-  FaChartBar,
   FaUserTie,
   FaTimesCircle,
   FaExclamationTriangle
@@ -57,7 +53,6 @@ const SermonsManagement: React.FC = () => {
 
   const { 
     sermons, 
-    sermonStats, 
     loadingSermons, 
     sermonError,
     refreshAllSermons, 
@@ -163,22 +158,6 @@ const SermonsManagement: React.FC = () => {
       console.error('Bulk delete error:', error);
     } finally {
       setIsBulkDeleting(false);
-    }
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedSermons(filteredSermons.map((s: Sermon) => s.id));
-    } else {
-      setSelectedSermons([]);
-    }
-  };
-
-  const handleSelectSermon = (id: number, checked: boolean) => {
-    if (checked) {
-      setSelectedSermons(prev => [...prev, id]);
-    } else {
-      setSelectedSermons(prev => prev.filter(sid => sid !== id));
     }
   };
 

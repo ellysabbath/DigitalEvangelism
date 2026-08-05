@@ -6,8 +6,7 @@ import {
   FaCheckCircle, FaClock, FaExclamationCircle,
   FaSpinner, FaDownload, FaPrint,
   FaSave, FaTimes, FaComment, FaChartBar,
-  FaFileAlt, FaUserGraduate, FaTrash, FaPlus,
-  FaExclamationTriangle, FaStar, FaRegStar
+  FaFileAlt, FaExclamationTriangle, FaStar
 } from 'react-icons/fa';
 import { useAdmin } from '../../auth/context/AdminContext';
 import { useAuth } from '../../auth/context/AuthContext';
@@ -81,8 +80,7 @@ const ExamManagement: React.FC = () => {
     sermons,
     refreshExamSubmissions,
     gradeExamSubmission,
-    getExamAnalytics,
-    getExamStats
+    getExamAnalytics
   } = useAdmin();
   
   // ============================================
@@ -109,6 +107,25 @@ const ExamManagement: React.FC = () => {
     averageScore: 0,
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // ============================================
+  // HELPER: Normalize IDs for comparison
+  // ============================================
+  const normalizeId = (id: any): string => String(id).trim();
+
+  // ============================================
+  // HELPER: Find answer by question ID (normalized)
+  // ============================================
+  const findAnswerForQuestion = useCallback((submission: Submission, questionId: string): Answer | undefined => {
+    if (!submission.answers || submission.answers.length === 0) {
+      return undefined;
+    }
+    
+    const normalizedQuestionId = normalizeId(questionId);
+    return submission.answers.find((a: Answer) => 
+      normalizeId(a.questionId) === normalizedQuestionId
+    );
+  }, []);
 
   // ============================================
   // EFFECTS
@@ -271,11 +288,13 @@ const ExamManagement: React.FC = () => {
     setIsSaving(true);
     try {
       const questions = selectedSubmission.questions || [];
-      const answers = selectedSubmission.answers || [];
       
       const updatedAnswers = questions.map((q: Question) => {
-        const existingAnswer = answers.find((a: Answer) => a.questionId === q.id);
         const editData = editingAnswers[q.id] || { score: 0, feedback: '' };
+        
+        const existingAnswer = selectedSubmission.answers.find(
+          (a: Answer) => normalizeId(a.questionId) === normalizeId(q.id)
+        );
         
         return {
           questionId: q.id,
@@ -674,11 +693,13 @@ const ExamManagement: React.FC = () => {
               {/* Questions and Answers */}
               <div className="space-y-4">
                 {(selectedSubmission.questions || []).map((question: Question, index: number) => {
-                  const answer = (selectedSubmission.answers || []).find(
-                    (a: Answer) => a.questionId === question.id
-                  );
-                  const editData = editingAnswers[question.id] || { score: 0, feedback: '' };
+                  // Find the answer using normalized ID matching
+                  const answer = findAnswerForQuestion(selectedSubmission, question.id);
+                  const studentAnswer = answer?.answer || 'No answer provided';
                   const maxScore = question.maxScore || answer?.maxScore || 0;
+                  
+                  // Get the editing data using the question ID
+                  const editData = editingAnswers[question.id] || { score: 0, feedback: '' };
                   
                   return (
                     <div key={question.id} className="p-4 border border-gray-200 rounded-lg hover:border-cyan-200 transition-colors">
@@ -706,14 +727,14 @@ const ExamManagement: React.FC = () => {
                           {/* Student Answer */}
                           <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Student's Answer:</p>
-                            {Array.isArray(answer?.answer) ? (
+                            {Array.isArray(studentAnswer) ? (
                               <ul className="list-disc list-inside text-sm text-gray-700">
-                                {(answer?.answer as string[]).map((item: string, i: number) => (
-                                  <li key={i}>{item}</li>
+                                {(studentAnswer as string[]).map((item: string, i: number) => (
+                                  <li key={i}>{item || '(empty)'}</li>
                                 ))}
                               </ul>
                             ) : (
-                              <p className="text-sm text-gray-700">{answer?.answer || 'No answer provided'}</p>
+                              <p className="text-sm text-gray-700">{studentAnswer || '(empty)'}</p>
                             )}
                           </div>
 
@@ -724,6 +745,8 @@ const ExamManagement: React.FC = () => {
                               <input
                                 type="number"
                                 step="0.5"
+                                min="0"
+                                max={maxScore || 100}
                                 value={editData.score}
                                 onChange={(e) => handleScoreChange(question.id, parseFloat(e.target.value) || 0)}
                                 className="w-24 px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm"
@@ -746,7 +769,7 @@ const ExamManagement: React.FC = () => {
                                   Zero
                                 </button>
                                 <button
-                                  onClick={() => handleScoreChange(question.id, maxScore / 2)}
+                                  onClick={() => handleScoreChange(question.id, Math.round(maxScore / 2))}
                                   className="text-xs text-gray-600 hover:text-gray-700 font-medium"
                                 >
                                   Half
@@ -901,9 +924,12 @@ const ExamManagement: React.FC = () => {
               {/* Questions and Answers */}
               <div className="space-y-4">
                 {(selectedSubmission.questions || []).map((question: Question, index: number) => {
-                  const answer = (selectedSubmission.answers || []).find(
-                    (a: Answer) => a.questionId === question.id
-                  );
+                  // Find the answer using normalized ID matching
+                  const answer = findAnswerForQuestion(selectedSubmission, question.id);
+                  const studentAnswer = answer?.answer || 'No answer provided';
+                  const score = answer?.score || 0;
+                  const maxScore = question.maxScore || answer?.maxScore || 0;
+                  const feedback = answer?.feedback || '';
                   
                   return (
                     <div key={question.id} className="p-4 border border-gray-200 rounded-lg">
@@ -920,30 +946,31 @@ const ExamManagement: React.FC = () => {
                           </div>
                           <p className="text-sm font-medium text-gray-900">{question.text}</p>
                           
+                          {/* Student Answer */}
                           <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Answer:</p>
-                            {Array.isArray(answer?.answer) ? (
+                            {Array.isArray(studentAnswer) ? (
                               <ul className="list-disc list-inside text-sm text-gray-700">
-                                {(answer?.answer as string[]).map((item: string, i: number) => (
-                                  <li key={i}>{item}</li>
+                                {(studentAnswer as string[]).map((item: string, i: number) => (
+                                  <li key={i}>{item || '(empty)'}</li>
                                 ))}
                               </ul>
                             ) : (
-                              <p className="text-sm text-gray-700">{answer?.answer || 'No answer provided'}</p>
+                              <p className="text-sm text-gray-700">{studentAnswer || '(empty)'}</p>
                             )}
                           </div>
 
                           {selectedSubmission.status !== 'pending' && (
-                            <div className="mt-3 flex items-center space-x-4">
+                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
                               <div>
                                 <span className="text-sm text-gray-600">Score: </span>
-                                <span className={`font-bold ${getGradeColor(((answer?.score || 0) / (answer?.maxScore || 1)) * 100)}`}>
-                                  {answer?.score || 0}/{answer?.maxScore || 0}
+                                <span className={`font-bold ${getGradeColor((score / (maxScore || 1)) * 100)}`}>
+                                  {score}/{maxScore || 0}
                                 </span>
                               </div>
-                              {answer?.feedback && (
+                              {feedback && (
                                 <div className="text-sm text-gray-600">
-                                  <span className="font-medium">Feedback:</span> {answer.feedback}
+                                  <span className="font-medium">Feedback:</span> {feedback}
                                 </div>
                               )}
                             </div>

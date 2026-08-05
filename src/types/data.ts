@@ -588,3 +588,119 @@ export interface ExamAnalytics {
   }>;
   top_performers: ExamSubmission[];
 }
+
+
+
+
+export interface ApiResponse<T = any> {
+  data: T;
+  message?: string;
+  status?: string;
+  status_code?: number;
+  success?: boolean;
+  errors?: string[] | Record<string, string[]>;
+  pagination?: {
+    current_page: number;
+    total_pages: number;
+    total_items: number;
+    items_per_page: number;
+  };
+}
+
+
+
+// Add these to your src/types/data.ts file
+
+// ============================================
+// AUTHENTICATION TYPES
+// ============================================
+
+export interface LoginRequest {
+  phone_number?: string;
+  email?: string;
+  password: string;
+  // If using verification codes
+  code?: string;
+}
+
+export interface RegisterRequest {
+  full_name: string;
+  phone_number: string;
+  email: string;
+  country_code: string;
+  church_name?: string;
+  region: string;
+  city: string;
+  street?: string;
+  password?: string;
+  profile?: {
+    bio?: string;
+    profile_picture?: string | null;
+  };
+}
+
+export interface VerifyRequest {
+  phone_number: string;
+  code: string;
+}
+
+export interface AuthResponse {
+  access?: string;
+  refresh?: string;
+  user: User;
+  message?: string;
+  requires_verification?: boolean;
+  phone_number?: string;
+  verification_codes?: string[];
+  status?: string;
+  data?: {
+    access?: string;
+    refresh?: string;
+    user?: User;
+    message?: string;
+    requires_verification?: boolean;
+    phone_number?: string;
+  };
+}
+
+// Also add these if they're not already defined
+export interface LoginData {
+  username?: string;
+  email?: string;
+  phone_number?: string;
+  password: string;
+}
+
+export interface TokenResponse {
+  access: string;
+  refresh: string;
+}
+
+export interface RefreshTokenRequest {
+  refresh: string;
+}
+
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetConfirmRequest {
+  token: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+}

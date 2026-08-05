@@ -5,8 +5,7 @@ import {
   FaUserGraduate, FaChurch, FaFilter, FaArrowLeft, 
   FaSpinner, FaTimesCircle, FaCheckCircle, FaSync,
   FaUserTie, FaCalendar, FaUserPlus, FaUserMinus,
-  FaEnvelope, FaPhone, FaExclamationTriangle,
-  FaUser
+  FaEnvelope, FaPhone, FaExclamationTriangle
 } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../auth/context/AdminContext';
@@ -132,10 +131,6 @@ const ViewMembersModal: React.FC<ViewMembersModalProps> = ({
   onRemoveMember
 }) => {
   if (!isOpen || !group) return null;
-
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString();
-  };
 
   const getInitials = (name: string) => {
     return name?.charAt(0).toUpperCase() || 'U';
@@ -264,20 +259,17 @@ const GroupsManagement: React.FC = () => {
     deleteGroup,
     addGroupMember,
     removeGroupMember,
-    students,
-    refreshAllStudents,
-    users,
-    refreshUsers
+    users,           // Use users instead of students
+    refreshUsers     // Use refreshUsers instead of refreshAllStudents
   } = useAdmin();
   
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterType, setFilterType] = useState<'all' | 'evangelist' | 'student' | 'mixed'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
-  const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
+  const [selectedGroups] = useState<number[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [expandedGroupId, setExpandedGroupId] = useState<number | null>(null);
   
   // ========== VIEW MEMBERS MODAL STATE ==========
   const [showViewMembersModal, setShowViewMembersModal] = useState(false);
@@ -298,8 +290,20 @@ const GroupsManagement: React.FC = () => {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [selectedGroupName, setSelectedGroupName] = useState<string>('');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedUserName, setSelectedUserName] = useState<string>('');
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [currentGroupMemberIds, setCurrentGroupMemberIds] = useState<number[]>([]);
+
+  // Load current group members when modal opens
+  useEffect(() => {
+    if (showAddMemberModal && selectedGroupId) {
+      const group = groups.find(g => g.id === selectedGroupId);
+      if (group && group.members) {
+        setCurrentGroupMemberIds(group.members.map(m => m.id));
+      }
+    }
+  }, [showAddMemberModal, selectedGroupId, groups]);
 
   // Filter groups
   const filteredGroups = groups.filter(group => {
@@ -316,13 +320,18 @@ const GroupsManagement: React.FC = () => {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  // Filter students for member selection
-  const filteredStudents = students.filter(student => {
+  // Filter users for member selection - EXCLUDE already added members
+  const filteredUsers = users.filter(user => {
+    // Check if user is already in the group
+    if (currentGroupMemberIds.includes(user.id)) {
+      return false;
+    }
+    
     const matchesSearch = 
-      student.full_name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-      student.email?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-      student.phone?.includes(memberSearchQuery) ||
-      student.student_id?.toLowerCase().includes(memberSearchQuery.toLowerCase());
+      user.full_name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+      user.email?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+      user.phone_number?.includes(memberSearchQuery) ||
+      user.id?.toString().includes(memberSearchQuery);
     return matchesSearch;
   });
 
@@ -379,7 +388,6 @@ const GroupsManagement: React.FC = () => {
             await deleteGroup(id);
           }
           toast.success(`${selectedGroups.length} group(s) deleted successfully`);
-          setSelectedGroups([]);
           refreshAllGroups();
         } catch (error: any) {
           toast.error(error.response?.data?.error || 'Failed to delete groups');
@@ -391,30 +399,9 @@ const GroupsManagement: React.FC = () => {
     });
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedGroups(filteredGroups.map(g => g.id));
-    } else {
-      setSelectedGroups([]);
-    }
-  };
-
-  const handleSelectGroup = (id: number, checked: boolean) => {
-    if (checked) {
-      setSelectedGroups(prev => [...prev, id]);
-    } else {
-      setSelectedGroups(prev => prev.filter(gid => gid !== id));
-    }
-  };
-
   const handleRefresh = () => {
     refreshAllGroups();
-    if (refreshAllStudents) {
-      refreshAllStudents();
-    }
-    if (refreshUsers) {
-      refreshUsers();
-    }
+    refreshUsers();
     toast.success('Refreshed!');
   };
 
@@ -425,9 +412,15 @@ const GroupsManagement: React.FC = () => {
 
   // ========== ADD MEMBER HANDLERS ==========
   const handleOpenAddMemberModal = (groupId: number, groupName: string) => {
+    // Load current group members
+    const group = groups.find(g => g.id === groupId);
+    if (group && group.members) {
+      setCurrentGroupMemberIds(group.members.map(m => m.id));
+    }
     setSelectedGroupId(groupId);
     setSelectedGroupName(groupName);
     setSelectedUserId(null);
+    setSelectedUserName('');
     setMemberSearchQuery('');
     setShowAddMemberModal(true);
   };
@@ -437,42 +430,68 @@ const GroupsManagement: React.FC = () => {
     setSelectedGroupId(null);
     setSelectedGroupName('');
     setSelectedUserId(null);
+    setSelectedUserName('');
     setMemberSearchQuery('');
+    setCurrentGroupMemberIds([]);
   };
 
-  const handleAddMember = () => {
-    if (!selectedGroupId || !selectedUserId) {
-      toast.error('Please select a student to add');
+  const handleSelectUser = (userId: number, userName: string) => {
+    setSelectedUserId(userId);
+    setSelectedUserName(userName);
+  };
+
+  const handleAddMemberClick = () => {
+    if (!selectedUserId) {
+      toast.error('Please select a user to add');
       return;
     }
 
-    const student = students.find(s => s.id === selectedUserId);
-    const studentName = student?.full_name || 'Student';
-
     setConfirmationModal({
       isOpen: true,
-      title: 'Add Member',
-      message: `Are you sure you want to add "${studentName}" to "${selectedGroupName}"?`,
+      title: 'Add Member to Group',
+      message: `Are you sure you want to add "${selectedUserName}" to "${selectedGroupName}"?`,
       confirmText: 'Add Member',
       type: 'success',
-      onConfirm: async () => {
-        setIsAddingMember(true);
-        try {
-          await addGroupMember(selectedGroupId!, selectedUserId!);
-          toast.success(`${studentName} added to group successfully`);
-          handleCloseAddMemberModal();
-          refreshAllGroups();
-          // Refresh the group to show updated members
-          const updatedGroup = await groupsAPI.get(selectedGroupId!);
-          setSelectedGroupForMembers(updatedGroup.data);
-        } catch (error: any) {
-          toast.error(error.response?.data?.error || 'Failed to add member');
-        } finally {
-          setIsAddingMember(false);
-          setConfirmationModal(prev => ({ ...prev, isOpen: false }));
-        }
-      }
+      onConfirm: handleConfirmAddMember
     });
+  };
+
+  const handleConfirmAddMember = async () => {
+    if (!selectedGroupId || !selectedUserId) {
+      toast.error('Missing group or user information');
+      setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+      return;
+    }
+
+    setIsAddingMember(true);
+    try {
+      await addGroupMember(selectedGroupId, selectedUserId);
+      toast.success(`${selectedUserName} added to group successfully`);
+      
+      setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+      
+      // Update the current group members list
+      setCurrentGroupMemberIds(prev => [...prev, selectedUserId!]);
+      
+      // Reset selection
+      setSelectedUserId(null);
+      setSelectedUserName('');
+      setMemberSearchQuery('');
+      
+      // Refresh data
+      await refreshAllGroups();
+      
+      if (selectedGroupId) {
+        const updatedGroup = await groupsAPI.get(selectedGroupId);
+        setSelectedGroupForMembers(updatedGroup.data);
+      }
+      
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to add member');
+      setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+    } finally {
+      setIsAddingMember(false);
+    }
   };
 
   const handleRemoveMember = (groupId: number, userId: number, userName: string) => {
@@ -486,8 +505,10 @@ const GroupsManagement: React.FC = () => {
         try {
           await removeGroupMember(groupId, userId);
           toast.success(`${userName} removed from group`);
+          
+          setCurrentGroupMemberIds(prev => prev.filter(id => id !== userId));
+          
           refreshAllGroups();
-          // Refresh the group to show updated members
           const updatedGroup = await groupsAPI.get(groupId);
           setSelectedGroupForMembers(updatedGroup.data);
         } catch (error: any) {
@@ -889,55 +910,90 @@ const GroupsManagement: React.FC = () => {
                   <FaTimesCircle />
                 </button>
               </div>
-              <p className="text-sm text-gray-600 mt-1">Add a student to <strong>{selectedGroupName}</strong></p>
+              <p className="text-sm text-gray-600 mt-1">Add a user to <strong>{selectedGroupName}</strong></p>
+              <p className="text-xs text-cyan-600 mt-1">
+                {currentGroupMemberIds.length} members currently in group
+              </p>
             </div>
 
             <div className="p-6 space-y-4">
-              {/* Search Students */}
+              {/* Search Users */}
               <div className="relative">
                 <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search students by name, email or ID..."
+                  placeholder="Search users by name, email or ID..."
                   value={memberSearchQuery}
                   onChange={(e) => setMemberSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 />
               </div>
 
-              {/* Students List */}
+              {/* Users List */}
               <div className="max-h-60 overflow-y-auto space-y-2">
-                {filteredStudents.length === 0 ? (
-                  <p className="text-center text-gray-500 py-4">No students found</p>
+                {users.length === 0 ? (
+                  <div className="text-center py-4">
+                    <FaExclamationTriangle className="text-2xl text-yellow-500 mx-auto mb-2" />
+                    <p className="text-gray-500 text-sm">No users loaded in the system</p>
+                    <button
+                      onClick={refreshUsers}
+                      className="mt-2 text-sm text-cyan-600 hover:text-cyan-700"
+                    >
+                      Load Users
+                    </button>
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-gray-500 text-sm">
+                      {memberSearchQuery ? 'No users found matching your search' : 'All available users have been added to this group'}
+                    </p>
+                    {currentGroupMemberIds.length > 0 && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        {currentGroupMemberIds.length} members already in this group
+                      </p>
+                    )}
+                    {!memberSearchQuery && users.length === currentGroupMemberIds.length && (
+                      <p className="text-xs text-green-500 mt-1">
+                        All {users.length} users are already in this group
+                      </p>
+                    )}
+                  </div>
                 ) : (
-                  filteredStudents.map((student) => (
+                  filteredUsers.map((user) => (
                     <div
-                      key={student.id}
+                      key={user.id}
                       className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedUserId === student.id
+                        selectedUserId === user.id
                           ? 'border-cyan-500 bg-cyan-50'
                           : 'border-gray-200 hover:border-cyan-300 hover:bg-gray-50'
                       }`}
-                      onClick={() => setSelectedUserId(student.id)}
+                      onClick={() => handleSelectUser(user.id, user.full_name)}
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium text-gray-900">{student.full_name}</p>
+                          <p className="font-medium text-gray-900">{user.full_name}</p>
                           <p className="text-xs text-gray-500 flex items-center">
-                            <FaEnvelope className="mr-1" /> {student.email}
+                            <FaEnvelope className="mr-1" /> {user.email}
                           </p>
                           <p className="text-xs text-gray-500 flex items-center">
-                            <FaPhone className="mr-1" /> {student.phone}
+                            <FaPhone className="mr-1" /> {user.phone_number}
                           </p>
-                          <p className="text-xs text-gray-400">ID: {student.student_id}</p>
+                          <p className="text-xs text-gray-400">Role: {user.role || 'User'} | ID: {user.id}</p>
                         </div>
-                        {selectedUserId === student.id && (
+                        {selectedUserId === user.id && (
                           <FaCheckCircle className="text-cyan-500 text-xl" />
                         )}
                       </div>
                     </div>
                   ))
                 )}
+              </div>
+
+              {/* Show counts */}
+              <div className="text-xs text-gray-400 text-center flex justify-center gap-4">
+                <span>Total users: {users.length}</span>
+                <span>In group: {currentGroupMemberIds.length}</span>
+                <span>Available: {filteredUsers.length}</span>
               </div>
             </div>
 
@@ -946,24 +1002,19 @@ const GroupsManagement: React.FC = () => {
                 onClick={handleCloseAddMemberModal}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                Cancel
+                Close
               </button>
               <button
-                onClick={handleAddMember}
+                onClick={handleAddMemberClick}
                 disabled={!selectedUserId || isAddingMember}
                 className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
               >
                 {isAddingMember ? (
-                  <>
-                    <FaSpinner className="animate-spin mr-2" />
-                    Adding...
-                  </>
+                  <FaSpinner className="animate-spin mr-2" />
                 ) : (
-                  <>
-                    <FaUserPlus className="mr-2" />
-                    Add Member
-                  </>
+                  <FaUserPlus className="mr-2" />
                 )}
+                Add Member
               </button>
             </div>
           </div>

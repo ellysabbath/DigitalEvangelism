@@ -4,10 +4,9 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { 
   FaArrowLeft, FaSpinner, FaUsers, FaUserGraduate, 
   FaChurch, FaUserTie, FaEnvelope, FaPhone, 
-  FaCheckCircle, FaTimesCircle, FaCalendar, 
-  FaEdit, FaTrash, FaUserPlus, FaUserMinus,
-  FaExclamationTriangle, FaSync, FaMapMarkerAlt,
-  FaUser, FaMailBulk, FaPhoneAlt
+  FaCheckCircle, FaTimesCircle, 
+  FaEdit, FaTrash, FaUserPlus,
+  FaExclamationTriangle, FaSync
 } from 'react-icons/fa';
 import { useAdmin } from '../../auth/context/AdminContext';
 import { groupsAPI } from '../../services/api';
@@ -121,7 +120,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 const GroupsView: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { users, refreshAllGroups, loading } = useAdmin();
+  const { users, refreshAllGroups } = useAdmin();
   
   const [group, setGroup] = useState<Group | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -196,7 +195,7 @@ const GroupsView: React.FC = () => {
     if (id) {
       groupsAPI.get(parseInt(id))
         .then(response => setGroup(response.data))
-        .catch(err => toast.error('Failed to refresh group'));
+        .catch(() => toast.error('Failed to refresh group'));
     }
   };
 

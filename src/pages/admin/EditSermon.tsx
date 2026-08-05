@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   FaArrowLeft, FaSpinner, FaSave, FaQuestion, FaPlus, FaTrash, 
   FaClock, FaUsers, FaBook, FaBible, FaTimesCircle,
-  FaCheckCircle, FaEdit, FaCopy, FaStar, FaRegStar
+  FaCheckCircle, FaEdit, FaCopy, FaStar,
 } from 'react-icons/fa';
 import { useAdmin } from '../../auth/context/AdminContext';
 import { sermonsAPI } from '../../services/api';

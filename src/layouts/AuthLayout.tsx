@@ -1,7 +1,7 @@
 // src/layouts/AuthLayout.tsx
 import React from 'react';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+
 import { FaChurch, FaSpinner } from 'react-icons/fa';
 
 interface AuthLayoutProps {

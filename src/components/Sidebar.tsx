@@ -1,7 +1,7 @@
 import React from 'react';
 import dis from '../assets/dis.jpg';
 import disa from '../assets/disa.jpg';
-import dise from '../assets/dise.jpg';
+
 
 const Sidebar: React.FC = () => {
   return (

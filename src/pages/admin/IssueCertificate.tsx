@@ -1,20 +1,16 @@
-// src/pages/admin/CertificateAdmin.tsx
-import React, { useState, useRef, useEffect } from 'react';
+// src/pages/admin/IssueCertificate.tsx
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FaArrowLeft, FaCertificate, FaSearch, FaUserGraduate, 
-  FaLemon, FaCalendarAlt, FaIdCard, FaEnvelope, FaPhone,
-  FaChurch, FaMapMarkerAlt, FaAward, FaCheckCircle,
-  FaClock, FaSpinner, FaPlus, FaTimes, FaDownload,
-  FaPrint, FaShare, FaQrcode, FaEye, FaStar, FaUser,
-  FaUpload, FaSignature, FaFilePdf, FaImage, FaUserTie,
-  FaBriefcase, FaClock as FaClockIcon,
-  FaSave, FaTrash, FaEdit, FaUsers, FaBook, FaFileAlt,
-  FaGem, FaCrown, FaRibbon, FaPalette, FaBorderAll,
-  FaRegGem, FaRegStar, FaRegSun, FaArrowRight, FaArrowLeft as FaArrowLeftIcon,
+  FaAward, FaCheckCircle,
+  FaSpinner, FaPlus, FaDownload,
+  FaPrint, FaEye,
+  FaUpload, FaSignature,  FaImage,
+  FaSave, FaTrash, FaEdit, FaFileAlt,
+  FaGem, FaCrown,  FaPalette,
   FaExclamationTriangle, FaQuestionCircle, FaShieldAlt,
-  FaDatabase, FaSync, FaHistory, FaLock, FaUnlock,
-  FaArchive
+  FaSync, FaArchive
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { FaNoteSticky } from 'react-icons/fa6';
@@ -176,10 +172,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 const CertificateAdmin: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState<'issue' | 'manage' | 'preview' | 'edit'>('manage');
   const [selectedTheme, setSelectedTheme] = useState<'gold' | 'blue' | 'green' | 'purple' | 'rose'>('gold');
   const [isEditMode, setIsEditMode] = useState(false);
@@ -194,6 +187,8 @@ const CertificateAdmin: React.FC = () => {
     type: 'warning' as 'danger' | 'warning' | 'info' | 'success',
     onConfirm: () => {},
   });
+
+  const [isSubmitting] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const personImageInputRef = useRef<HTMLInputElement>(null);
@@ -563,7 +558,6 @@ const CertificateAdmin: React.FC = () => {
     setFormData(initialFormData);
     setIsEditMode(false);
     setEditingId(null);
-    setShowPreview(false);
   };
 
   const showConfirmationModal = ({

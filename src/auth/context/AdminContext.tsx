@@ -114,7 +114,7 @@ interface AdminContextType {
   getStudentStatusBadge: (student: Student) => {
     label: string;
     className: string;
-    icon: JSX.Element;
+    icon: React.ReactElement;
   };
   
   // Evangelist Functions
@@ -152,7 +152,7 @@ interface AdminContextType {
   getSermonStatusBadge: (sermon: Sermon) => {
     label: string;
     className: string;
-    icon: JSX.Element;
+    icon: React.ReactElement;
   };
   
   // Comment Functions
@@ -431,7 +431,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
   }, [studentStats]);
 
   const getStudentStatusBadge = useCallback((student: Student) => {
-    const statusMap: Record<string, { label: string; className: string; icon: JSX.Element }> = {
+    const statusMap: Record<string, { label: string; className: string; icon: React.ReactElement; }> = {
       active: { label: 'Active', className: 'bg-green-100 text-green-700', icon: <span className="mr-1">+</span> },
       pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-700', icon: <span className="mr-1">!</span> },
       graduated: { label: 'Graduated', className: 'bg-blue-100 text-blue-700', icon: <span className="mr-1">*</span> },
@@ -686,7 +686,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
   }, [sermonStats]);
 
   const getSermonStatusBadge = useCallback((sermon: Sermon) => {
-    const statusMap: Record<string, { label: string; className: string; icon: JSX.Element }> = {
+    const statusMap: Record<string, { label: string; className: string; icon: React.ReactElement; }> = {
       published: { label: 'Published', className: 'bg-green-100 text-green-700', icon: <span className="mr-1">+</span> },
       draft: { label: 'Draft', className: 'bg-yellow-100 text-yellow-700', icon: <span className="mr-1">!</span> },
       archived: { label: 'Archived', className: 'bg-gray-100 text-gray-700', icon: <span className="mr-1">-</span> },

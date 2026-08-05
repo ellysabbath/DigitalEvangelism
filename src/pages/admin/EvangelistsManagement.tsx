@@ -4,13 +4,13 @@ import {
   FaSearch, FaPlus, FaEye, FaEdit, FaTrash, FaUserTie, 
   FaEnvelope, FaPhone, FaChurch, FaArrowLeft, FaUsers, 
   FaSpinner, FaTimesCircle, FaCheckCircle, FaSync,
-  FaMapMarkerAlt, FaFilter, FaCalendar, FaChartBar,
-  FaUserCheck, FaUserTimes, FaExclamationTriangle,
-  FaTimes, FaSave, FaUser
+  FaFilter, FaCalendar,
+  FaExclamationTriangle,
+  FaTimes, FaSave
 } from 'react-icons/fa';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../auth/context/AdminContext';
-import { evangelistsAPI, crudAPI } from '../../services/api';
+import { evangelistsAPI } from '../../services/api';
 import type { Evangelist, UserCRUD } from '../../types/data';
 import toast from 'react-hot-toast';
 
@@ -124,7 +124,6 @@ interface EvangelistModalProps {
   onSuccess: () => void;
   evangelist?: Evangelist | null;
   users: UserCRUD[];
-  isLoading?: boolean;
 }
 
 const EvangelistModal: React.FC<EvangelistModalProps> = ({
@@ -133,7 +132,6 @@ const EvangelistModal: React.FC<EvangelistModalProps> = ({
   onSuccess,
   evangelist,
   users,
-  isLoading = false
 }) => {
   const isEdit = !!evangelist;
   const [formData, setFormData] = useState({
@@ -212,7 +210,8 @@ const EvangelistModal: React.FC<EvangelistModalProps> = ({
     }
   };
 
-  const availableUsers = users.filter(u => u.role === 'evangelist');
+  // Filter users with evangelist role
+  const availableUsers = users.filter(u => u.role === 'evangelist' || u.role === 'admin');
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
@@ -257,14 +256,23 @@ const EvangelistModal: React.FC<EvangelistModalProps> = ({
                 required
               >
                 <option value="">Select a user</option>
-                {availableUsers.map(user => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name} ({user.email} - {user.phone_number})
-                  </option>
-                ))}
+                {availableUsers.length > 0 ? (
+                  availableUsers.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name} ({user.email} - {user.phone_number})
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>No evangelist users available</option>
+                )}
               </select>
               {isEdit && (
                 <p className="text-xs text-gray-500 mt-1">User cannot be changed after creation</p>
+              )}
+              {availableUsers.length === 0 && !isEdit && (
+                <p className="text-xs text-yellow-500 mt-1">
+                  No users with evangelist role found. Please create a user with evangelist role first.
+                </p>
               )}
             </div>
 
@@ -334,7 +342,7 @@ const EvangelistModal: React.FC<EvangelistModalProps> = ({
           <div className="mt-6 pt-4 border-t border-gray-200 flex gap-3">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || (!isEdit && availableUsers.length === 0)}
               className="flex-1 flex justify-center items-center py-2.5 px-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50"
             >
               {isSubmitting ? (
@@ -519,13 +527,13 @@ const EvangelistsManagement: React.FC = () => {
   const navigate = useNavigate();
   const { 
     evangelists, 
-    evangelistStats, 
     loadingEvangelists, 
     evangelistError,
     refreshAllEvangelists,
     deleteEvangelist,
     users,
-    refreshUsers
+    refreshUsers,
+    loadingUsers
   } = useAdmin();
   
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -550,6 +558,13 @@ const EvangelistsManagement: React.FC = () => {
     type: 'warning' as 'danger' | 'warning' | 'info' | 'success',
     onConfirm: () => {},
   });
+
+  // Load users when component mounts
+  useEffect(() => {
+    if (users.length === 0 && !loadingUsers) {
+      refreshUsers();
+    }
+  }, []);
 
   // Filter evangelists
   const filteredEvangelists = evangelists.filter(evangelist => {
@@ -591,7 +606,7 @@ const EvangelistsManagement: React.FC = () => {
         try {
           await deleteEvangelist(id);
           toast.success(`Evangelist "${name}" deleted successfully`);
-          refreshAllEvangelists();
+          await refreshAllEvangelists();
         } catch (error: any) {
           toast.error(error.response?.data?.error || 'Failed to delete evangelist');
         } finally {
@@ -622,7 +637,7 @@ const EvangelistsManagement: React.FC = () => {
           }
           toast.success(`${selectedEvangelists.length} evangelist(s) deleted successfully`);
           setSelectedEvangelists([]);
-          refreshAllEvangelists();
+          await refreshAllEvangelists();
         } catch (error: any) {
           toast.error(error.response?.data?.error || 'Failed to delete evangelists');
         } finally {
@@ -649,9 +664,11 @@ const EvangelistsManagement: React.FC = () => {
     }
   };
 
-  const handleRefresh = () => {
-    refreshAllEvangelists();
-    refreshUsers();
+  const handleRefresh = async () => {
+    await Promise.all([
+      refreshAllEvangelists(),
+      refreshUsers()
+    ]);
     toast.success('Refreshed!');
   };
 
@@ -665,9 +682,11 @@ const EvangelistsManagement: React.FC = () => {
     setShowEditModal(true);
   };
 
-  const handleModalSuccess = () => {
-    refreshAllEvangelists();
-    refreshUsers();
+  const handleModalSuccess = async () => {
+    await Promise.all([
+      refreshAllEvangelists(),
+      refreshUsers()
+    ]);
   };
 
   // ========== HELPERS ==========

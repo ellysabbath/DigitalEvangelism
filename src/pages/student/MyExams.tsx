@@ -140,7 +140,7 @@ const MyExams: React.FC = () => {
       (userExams.filter((e: any) => e.status !== 'pending' && e.percentage > 0).length || 1),
   };
 
-  // ========== HELPERS (Same as ExamManagement) ==========
+  // ========== HELPERS ==========
   
   const calculateMaxPossibleScore = (exam: ExamAttempt): number => {
     if (exam.max_possible_score && exam.max_possible_score > 0) {
@@ -170,48 +170,77 @@ const MyExams: React.FC = () => {
     return 0;
   };
 
-  const getStatusBadge = (status: string, isPassed?: boolean) => {
-    const styles: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-700',
-      graded: 'bg-green-100 text-green-700',
-      reviewed: 'bg-blue-100 text-blue-700',
-      passed: 'bg-green-100 text-green-700',
-      failed: 'bg-red-100 text-red-700',
-    };
+  // ========== FIXED: PASS/FAIL LOGIC ==========
+  // Passing threshold is now 30% (or whatever is set in backend)
+  // The backend already calculates is_passed based on 70% threshold
+  // But we want to show Pass for scores >= 30
+  
+  const isExamPassed = (exam: ExamAttempt): boolean => {
+    // If exam is not graded yet, return false
+    if (exam.status === 'pending') return false;
     
-    if (status === 'graded' && isPassed !== undefined) {
-      return isPassed ? styles.passed : styles.failed;
-    }
+    // If backend already marked as passed, use that
+    if (exam.is_passed) return true;
     
-    return styles[status] || styles.pending;
+    // For scores >= 30, consider it passed
+    // This overrides the backend's 70% threshold
+    const percentage = exam.percentage || 0;
+    if (percentage >= 30) return true;
+    
+    return false;
   };
 
-  const getStatusIcon = (status: string, isPassed?: boolean) => {
-    if (status === 'graded' && isPassed !== undefined) {
-      return isPassed ? 
-        <FaCheckCircle className="text-green-500" /> : 
-        <FaExclamationCircle className="text-red-500" />;
+  const getStatusBadge = (exam: ExamAttempt) => {
+    if (exam.status === 'pending') {
+      return 'bg-yellow-100 text-yellow-700';
     }
     
-    switch(status) {
-      case 'pending': return <FaClock className="text-yellow-500" />;
-      case 'graded': return <FaCheckCircle className="text-green-500" />;
-      case 'reviewed': return <FaStar className="text-blue-500" />;
-      default: return <FaQuestionCircle className="text-gray-500" />;
+    if (exam.status === 'reviewed') {
+      return 'bg-blue-100 text-blue-700';
     }
+    
+    // For graded exams, use our custom pass/fail logic
+    if (exam.status === 'graded') {
+      return isExamPassed(exam) 
+        ? 'bg-green-100 text-green-700' 
+        : 'bg-red-100 text-red-700';
+    }
+    
+    return 'bg-gray-100 text-gray-700';
   };
 
-  const getStatusLabel = (status: string, isPassed?: boolean) => {
-    if (status === 'graded' && isPassed !== undefined) {
-      return isPassed ? 'Passed' : 'Failed';
+  const getStatusIcon = (exam: ExamAttempt) => {
+    if (exam.status === 'pending') {
+      return <FaClock className="text-yellow-500" />;
     }
-    return status.charAt(0).toUpperCase() + status.slice(1);
+    
+    if (exam.status === 'reviewed') {
+      return <FaStar className="text-blue-500" />;
+    }
+    
+    if (exam.status === 'graded') {
+      return isExamPassed(exam) 
+        ? <FaCheckCircle className="text-green-500" />
+        : <FaExclamationCircle className="text-red-500" />;
+    }
+    
+    return <FaQuestionCircle className="text-gray-500" />;
+  };
+
+  const getStatusLabel = (exam: ExamAttempt) => {
+    if (exam.status === 'pending') return 'Pending';
+    if (exam.status === 'reviewed') return 'Reviewed';
+    if (exam.status === 'graded') {
+      return isExamPassed(exam) ? 'Passed' : 'Failed';
+    }
+    return exam.status.charAt(0).toUpperCase() + exam.status.slice(1);
   };
 
   const getGradeColor = (percentage: number) => {
     if (percentage >= 80) return 'text-green-600';
-    if (percentage >= 60) return 'text-yellow-600';
-    if (percentage >= 40) return 'text-orange-600';
+    if (percentage >= 60) return 'text-green-500';
+    if (percentage >= 30) return 'text-blue-600';
+    if (percentage >= 20) return 'text-yellow-600';
     return 'text-red-600';
   };
 
@@ -220,6 +249,7 @@ const MyExams: React.FC = () => {
     if (percentage >= 70) return 'Very Good';
     if (percentage >= 60) return 'Good';
     if (percentage >= 50) return 'Satisfactory';
+    if (percentage >= 30) return 'Pass';
     return 'Needs Improvement';
   };
 
@@ -335,7 +365,7 @@ const MyExams: React.FC = () => {
           </button>
         </div>
 
-        {/* Stats Cards - Same as ExamManagement */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-cyan-500">
             <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
@@ -417,9 +447,8 @@ const MyExams: React.FC = () => {
               const maxPossible = calculateMaxPossibleScore(exam);
               const totalScore = calculateTotalScore(exam);
               const percentage = maxPossible > 0 ? (totalScore / maxPossible) * 100 : 0;
-              const displayStatus = exam.status === 'graded' 
-                ? (exam.is_passed ? 'passed' : 'failed')
-                : exam.status;
+              const passed = isExamPassed(exam);
+              const displayStatus = passed ? 'passed' : (exam.status === 'pending' ? 'pending' : 'failed');
               
               return (
                 <div key={exam.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all overflow-hidden group">
@@ -433,16 +462,16 @@ const MyExams: React.FC = () => {
                         </div>
                         <p className="text-xs text-gray-500 mt-1">Topic: {exam.sermon_topic || 'General'}</p>
                       </div>
-                      <span className={`inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-medium rounded-full ${getStatusBadge(exam.status, exam.is_passed)}`}>
-                        {getStatusIcon(exam.status, exam.is_passed)}
-                        <span>{getStatusLabel(exam.status, exam.is_passed)}</span>
+                      <span className={`inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-medium rounded-full ${getStatusBadge(exam)}`}>
+                        {getStatusIcon(exam)}
+                        <span>{getStatusLabel(exam)}</span>
                       </span>
                     </div>
                   </div>
 
                   {/* Card Body */}
                   <div className="p-4 space-y-3">
-                    {/* Score - Shows like ExamManagement */}
+                    {/* Score */}
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-600">Score</p>
@@ -487,7 +516,7 @@ const MyExams: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Actions - View, Retake (if failed), Share */}
+                    {/* Actions */}
                     <div className="flex space-x-2 pt-2 border-t border-gray-100">
                       <button
                         onClick={() => handleViewDetails(exam)}
@@ -496,7 +525,8 @@ const MyExams: React.FC = () => {
                         <FaEye className="mr-1" />
                         View
                       </button>
-                      {(exam.status === 'graded' && !exam.is_passed) && (
+                      {/* Show Retake only if failed (score < 30%) */}
+                      {exam.status === 'graded' && !passed && (
                         <button
                           onClick={() => handleRetakeExam(exam.sermon)}
                           className="flex-1 flex items-center justify-center px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg text-sm font-medium transition-colors"
@@ -564,9 +594,9 @@ const MyExams: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
                     <p className="text-sm text-gray-600">Status</p>
-                    <span className={`inline-flex items-center space-x-1 px-2.5 py-1 text-sm font-medium rounded-full ${getStatusBadge(selectedExam.status, selectedExam.is_passed)}`}>
-                      {getStatusIcon(selectedExam.status, selectedExam.is_passed)}
-                      <span>{getStatusLabel(selectedExam.status, selectedExam.is_passed)}</span>
+                    <span className={`inline-flex items-center space-x-1 px-2.5 py-1 text-sm font-medium rounded-full ${getStatusBadge(selectedExam)}`}>
+                      {getStatusIcon(selectedExam)}
+                      <span>{getStatusLabel(selectedExam)}</span>
                     </span>
                   </div>
                   <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
@@ -589,13 +619,41 @@ const MyExams: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Feedback */}
-                {selectedExam.feedback && (
+                {/* Pass/Fail Indicator - FIXED: Shows Pass for 30%+ */}
+                {selectedExam.status === 'graded' && (
                   <div className={`p-4 rounded-lg border ${
-                    selectedExam.is_passed
+                    isExamPassed(selectedExam)
                       ? 'bg-green-50 border-green-200'
                       : 'bg-red-50 border-red-200'
                   }`}>
+                    <div className="flex items-center space-x-3">
+                      {isExamPassed(selectedExam) ? (
+                        <FaCheckCircle className="text-3xl text-green-500" />
+                      ) : (
+                        <FaExclamationCircle className="text-3xl text-red-500" />
+                      )}
+                      <div>
+                        <h4 className={`text-lg font-bold ${
+                          isExamPassed(selectedExam) ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          {isExamPassed(selectedExam) ? '✅ Passed' : '❌ Failed'}
+                        </h4>
+                        <p className={`text-sm ${
+                          isExamPassed(selectedExam) ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {isExamPassed(selectedExam) 
+                            ? `Congratulations! You scored ${selectedExam.percentage?.toFixed(1)}% which is above the passing mark.`
+                            : `You scored ${selectedExam.percentage?.toFixed(1)}%. The passing mark is 30%.`
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Feedback */}
+                {selectedExam.feedback && (
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <h4 className="text-sm font-semibold text-gray-700 mb-1">Feedback</h4>
                     <p className="text-sm text-gray-700">{selectedExam.feedback}</p>
                     {selectedExam.graded_at && (
@@ -645,7 +703,7 @@ const MyExams: React.FC = () => {
                               </div>
 
                               {selectedExam.status !== 'pending' && (
-                                <div className="mt-3 flex items-center space-x-4">
+                                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
                                   <div>
                                     <span className="text-sm text-gray-600">Score: </span>
                                     <span className={`font-bold ${
@@ -673,9 +731,9 @@ const MyExams: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Actions - Retake (if failed) and Share */}
+                {/* Actions */}
                 <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
-                  {(selectedExam.status === 'graded' && !selectedExam.is_passed) && (
+                  {selectedExam.status === 'graded' && !isExamPassed(selectedExam) && (
                     <button
                       onClick={() => {
                         setShowDetailsModal(false);

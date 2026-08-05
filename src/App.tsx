@@ -29,7 +29,7 @@ import EditSermon from './pages/admin/EditSermon';
 import ViewSermon from './pages/admin/ViewSermon';
 import ViewStudent from './pages/admin/ViewStudent';
 import Certificates from './pages/Certificates';
-import IssueCertificate from './pages/admin/IssueCertificate';
+
 
 // Evangelist Pages
 import EvangelistDashboard from './pages/evangelist/EvangelistDashboard';
@@ -45,6 +45,9 @@ import Dashboard from './pages/Dashboard';
 import Sermons from './pages/Sermons';
 import SermonDetail from './pages/SermonDetail';
 import GroupsView from './pages/admin/GroupsView';
+import UserManagement from './pages/admin/UserManagement';
+import CertificateManagement from './pages/admin/CertificateManagement';
+import Profile from './pages/Profile';
 
 const App: React.FC = () => {
   return (
@@ -68,6 +71,7 @@ const App: React.FC = () => {
               <Route path="contact" element={<Contact />} />
               <Route path="news" element={<News />} />
               <Route path="gallery" element={<Gallery />} />
+              <Route path="profile" element={<Profile />} />
               
               {/* Sermon Public Pages */}
               <Route path="sermons" element={<Sermons />} />
@@ -86,13 +90,14 @@ const App: React.FC = () => {
               
               {/* Admin Pages */}
               <Route path="admin" element={<AdminDashboard />} />
+              <Route path="admin/users" element={<UserManagement />} />
               <Route path="admin/groups" element={<GroupsManagement />} />
               <Route path="admin/groups/:id" element={<GroupsView />} />  {/* ADD THIS LINE */}
               <Route path="admin/evangelists" element={<EvangelistsManagement />} />
               <Route path="admin/students" element={<StudentsManagement />} />
               <Route path="admin/sermons" element={<SermonsManagement />} />
               <Route path="certificates" element={<Certificates />} />
-              <Route path="admin/issue-certificate" element={<IssueCertificate />} />
+              <Route path="admin/issue-certificate" element={<CertificateManagement />} />
               
               {/* Admin CRUD Routes - Static routes BEFORE dynamic routes */}
               <Route path="admin/create-group" element={<CreateGroup />} />
