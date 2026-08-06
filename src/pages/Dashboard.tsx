@@ -1,269 +1,502 @@
-// src/pages/Dashboard.tsx
-import React, { useState, useEffect, useRef } from 'react';
+// src/pages/student/StudentDashboard.tsx
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { 
+  FaGraduationCap, FaAward, 
+  FaClock, FaCheckCircle, FaExclamationCircle,
+  FaSearch, FaBookOpen, FaShare,
+  FaChartLine, FaFileAlt, FaSpinner,
+  FaUser, FaCalendar, FaHeart, FaComment,
+  FaArrowRight,  FaFilter, FaTimesCircle,
+  FaBook, FaEye,  FaStar,
+   FaPrint, 
+   FaClipboardList,
+  FaQuestionCircle,  FaTimes
+} from 'react-icons/fa';
 import { useAuth } from '../auth/context/AuthContext';
 import { useAdmin } from '../auth/context/AdminContext';
-import { Link, useNavigate } from 'react-router-dom';
-import { 
-  FaUser, FaBook, 
-  FaClock, FaArrowRight,
-  FaBell, 
-   FaCertificate, FaBible,
-  FaEye, 
-  FaUserGraduate, 
-  FaCalendarAlt,
-  FaUsers,
-  FaChartBar,
-  FaHome,
-  FaSignOutAlt,
-  FaUserTie,
-  FaGraduationCap,
-  FaClipboardList,
-  FaNewspaper,
-
-  FaShare,
-  FaHeart,
- 
-  FaSpinner,
- 
-  FaChevronDown,
-  FaChevronUp,
-  FaChevronRight,
-
-} from 'react-icons/fa';
+import toast from 'react-hot-toast';
 
 // ============================================
 // TYPES
 // ============================================
 
-interface RecentSermon {
+interface Exam {
+  id: number;
+  sermon_title: string;
+  sermon: number;
+  status: 'pending' | 'graded' | 'reviewed';
+  percentage: number;
+  total_score: number;
+  max_possible_score: number;
+  is_passed: boolean;
+  submitted_at: string;
+  time_taken: number;
+  feedback?: string;
+  graded_by_name?: string;
+  graded_at?: string;
+  answers?: any[];
+  questions?: any[];
+}
+
+interface Certificate {
   id: string;
   title: string;
-  topic: string;
-  author: string;
-  date: string;
-  views: number;
-  likes: number;
-  shares: number;
-  status: 'new' | 'ongoing' | 'completed';
+  issuedDate: string;
+  certificateNumber: string;
+  status: 'issued' | 'pending';
+  grade?: string;
+}
+
+interface StudentStats {
+  totalExams: number;
+  completedExams: number;
+  pendingExams: number;
+  averageScore: number;
+  certificatesEarned: number;
+  progress: number;
+  passedExams: number;
+  failedExams: number;
 }
 
 // ============================================
-// NAVIGATION ITEMS BY ROLE
+// EXAM DETAIL MODAL
 // ============================================
 
-const getNavigationItems = (role: string) => {
-  const commonItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: <FaHome />, description: 'Main overview' },
-    { to: '/sermons', label: 'Sermons', icon: <FaBible />, description: 'Browse and read sermons' },
-    { to: '/profile', label: 'Profile', icon: <FaUser />, description: 'Your profile settings' },
-    { to: '/certificates', label: 'Certificates', icon: <FaCertificate />, description: 'Your earned certificates' },
-  ];
-  
-  const roleBasedItems: Record<string, any[]> = {
-    admin: [
-      ...commonItems,
-      { to: '/admin/users', label: 'User Management', icon: <FaUsers />, description: 'Manage system users' },
-      { to: '/admin/students', label: 'Students', icon: <FaGraduationCap />, description: 'Manage students' },
-      { to: '/admin/evangelists', label: 'Evangelists', icon: <FaUserTie />, description: 'Manage evangelists' },
-      { to: '/admin/groups', label: 'Groups', icon: <FaUsers />, description: 'Manage groups' },
-      { to: '/admin/sermons', label: 'Sermons', icon: <FaBook />, description: 'Manage sermons' },
-      { to: '/admin/subscriptions', label: 'Subscriptions', icon: <FaNewspaper />, description: 'Manage newsletter' },
-      { to: '/admin/issue-certificate', label: 'Issue Certificate', icon: <FaCertificate />, description: 'Issue new certificates' },
-    ],
-    evangelist: [
-      ...commonItems,
-      { to: '/ev/dashboard', label: 'My Dashboard', icon: <FaChartBar />, description: 'Evangelist overview' },
-      { to: '/ev/dashboard', label: 'My Students', icon: <FaGraduationCap />, description: 'Your students' },
-      { to: '/admin/groups', label: 'My Groups', icon: <FaUsers />, description: 'Your groups' },
-      { to: '/admin/students', label: 'Students', icon: <FaGraduationCap />, description: 'Manage students' },
-      { to: '/admin/issue-certificate', label: 'Issue Certificate', icon: <FaCertificate />, description: 'Issue new certificates' },
-      { to: '/admin/sermons', label: 'My Sermons', icon: <FaBook />, description: 'Your sermons' },
-      { to: '/evangelist/exams', label: 'Exam Management', icon: <FaClipboardList />, description: 'Grade exams' },
-    ],
-    student: [
-      ...commonItems,
-      { to: '/students', label: 'My Dashboard', icon: <FaChartBar />, description: 'Student overview' },
-      { to: '/student/exams', label: 'My Exams', icon: <FaClipboardList />, description: 'View your exams' },
-      { to: '/admin/groups', label: 'My Groups', icon: <FaUsers />, description: 'Your groups' },
-    ],
-    church_admin: [
-      ...commonItems,
-      { to: '/admin/students', label: 'Students', icon: <FaGraduationCap />, description: 'Manage students' },
-      { to: '/admin/evangelists', label: 'Evangelists', icon: <FaUserTie />, description: 'Manage evangelists' },
-      { to: '/admin/groups', label: 'Groups', icon: <FaUsers />, description: 'Manage groups' },
-      { to: '/admin/sermons', label: 'Sermons', icon: <FaBook />, description: 'Manage sermons' },
-    ],
-    super_admin: [
-      ...commonItems,
-      { to: '/admin/users', label: 'User Management', icon: <FaUsers />, description: 'Manage system users' },
-      { to: '/admin/students', label: 'Students', icon: <FaGraduationCap />, description: 'Manage students' },
-      { to: '/admin/evangelists', label: 'Evangelists', icon: <FaUserTie />, description: 'Manage evangelists' },
-      { to: '/admin/groups', label: 'Groups', icon: <FaUsers />, description: 'Manage groups' },
-      { to: '/admin/sermons', label: 'Sermons', icon: <FaBook />, description: 'Manage sermons' },
-      { to: '/admin/subscriptions', label: 'Subscriptions', icon: <FaNewspaper />, description: 'Manage newsletter' },
-      { to: '/admin/issue-certificate', label: 'Issue Certificate', icon: <FaCertificate />, description: 'Issue new certificates' },
-    ],
+interface ExamDetailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  exam: Exam | null;
+}
+
+const ExamDetailModal: React.FC<ExamDetailModalProps> = ({ isOpen, onClose, exam }) => {
+  if (!isOpen || !exam) return null;
+
+  const getStatusBadgeClass = (status: string, isPassed?: boolean) => {
+    if (status === 'pending') return 'bg-yellow-100 text-yellow-700';
+    if (status === 'reviewed') return 'bg-blue-100 text-blue-700';
+    if (status === 'graded') {
+      return isPassed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+    }
+    return 'bg-gray-100 text-gray-700';
   };
-  
-  return roleBasedItems[role] || commonItems;
+
+  const getStatusIcon = (status: string, isPassed?: boolean) => {
+    if (status === 'pending') return <FaClock className="text-yellow-500" />;
+    if (status === 'reviewed') return <FaStar className="text-blue-500" />;
+    if (status === 'graded') {
+      return isPassed ? <FaCheckCircle className="text-green-500" /> : <FaTimesCircle className="text-red-500" />;
+    }
+    return <FaQuestionCircle className="text-gray-500" />;
+  };
+
+  const getGradeColor = (percentage: number) => {
+    if (percentage >= 80) return 'text-green-600';
+    if (percentage >= 60) return 'text-blue-600';
+    if (percentage >= 40) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        {/* Header */}
+        <div className="sticky top-0 bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
+          <div className="flex items-center space-x-3">
+            <FaClipboardList className="text-white text-xl" />
+            <div>
+              <h3 className="text-white font-bold text-lg">Exam Details</h3>
+              <p className="text-cyan-100 text-sm">{exam.sermon_title}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/20 rounded-lg"
+          >
+            <FaTimes className="text-xl" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6">
+          {/* Status and Score Summary */}
+          <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="flex items-center space-x-3">
+              <div className={`p-3 rounded-full ${
+                exam.status === 'graded' && exam.is_passed ? 'bg-green-100' :
+                exam.status === 'graded' && !exam.is_passed ? 'bg-red-100' :
+                'bg-yellow-100'
+              }`}>
+                {getStatusIcon(exam.status, exam.is_passed)}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Status</p>
+                <span className={`inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-medium rounded-full ${getStatusBadgeClass(exam.status, exam.is_passed)}`}>
+                  <span>{exam.status === 'pending' ? 'Pending Grading' : exam.status === 'reviewed' ? 'Reviewed' : exam.is_passed ? 'Passed' : 'Failed'}</span>
+                </span>
+              </div>
+            </div>
+
+            {exam.status !== 'pending' && (
+              <div className="flex-1" />
+            )}
+
+            {exam.status !== 'pending' && (
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Score</p>
+                <div className={`text-2xl font-bold ${getGradeColor(exam.percentage || 0)}`}>
+                  {exam.percentage?.toFixed(1) || 0}%
+                </div>
+                <p className="text-xs text-gray-500">
+                  {exam.total_score || 0} / {exam.max_possible_score || 0}
+                </p>
+              </div>
+            )}
+
+            {exam.status === 'pending' && (
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Status</p>
+                <p className="text-sm text-yellow-600 font-medium">Awaiting Grading</p>
+              </div>
+            )}
+          </div>
+
+          {/* Exam Info Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-xs text-blue-600 font-medium">Submitted</p>
+              <p className="text-sm font-medium text-gray-900">{formatDate(exam.submitted_at)}</p>
+            </div>
+            {exam.time_taken > 0 && (
+              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="text-xs text-purple-600 font-medium">Time Taken</p>
+                <p className="text-sm font-medium text-gray-900">{exam.time_taken} minutes</p>
+              </div>
+            )}
+            {exam.graded_at && (
+              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-xs text-green-600 font-medium">Graded On</p>
+                <p className="text-sm font-medium text-gray-900">{formatDate(exam.graded_at)}</p>
+              </div>
+            )}
+            {exam.graded_by_name && (
+              <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                <p className="text-xs text-indigo-600 font-medium">Graded By</p>
+                <p className="text-sm font-medium text-gray-900">{exam.graded_by_name}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Questions & Answers */}
+          {exam.questions && exam.questions.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                <FaQuestionCircle className="mr-2 text-cyan-500" />
+                Questions & Answers
+              </h4>
+              <div className="space-y-3 max-h-60 overflow-y-auto">
+                {exam.questions.map((question: any, index: number) => {
+                  const answer = exam.answers?.find((a: any) => a.questionId === question.id);
+                  const isCorrect = answer?.score === answer?.maxScore;
+                  
+                  return (
+                    <div key={index} className="p-3 border border-gray-200 rounded-lg hover:border-cyan-200 transition-colors">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium text-gray-500">Q{index + 1}</span>
+                            <span className="text-xs text-gray-400">{question.type?.replace('_', ' ')}</span>
+                            {question.required && <span className="text-xs text-red-500">*</span>}
+                            {exam.status !== 'pending' && (
+                              <span className={`text-xs ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
+                                {isCorrect ? '✓' : '✗'}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm font-medium text-gray-900">{question.text}</p>
+                          
+                          {/* Student's Answer */}
+                          <div className="mt-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                            <p className="text-xs text-gray-500">Your Answer:</p>
+                            {Array.isArray(answer?.answer) ? (
+                              <ul className="list-disc list-inside text-sm text-gray-700">
+                                {(answer?.answer as string[]).map((item: string, i: number) => (
+                                  <li key={i}>{item || '(empty)'}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-gray-700">{answer?.answer || 'No answer provided'}</p>
+                            )}
+                          </div>
+
+                          {exam.status !== 'pending' && (
+                            <div className="mt-2 flex items-center gap-4 text-sm">
+                              <span className="text-gray-600">
+                                Score: <span className={`font-bold ${answer?.score === answer?.maxScore ? 'text-green-600' : answer?.score > 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                  {answer?.score || 0}/{answer?.maxScore || 0}
+                                </span>
+                              </span>
+                              {answer?.feedback && (
+                                <span className="text-gray-600">
+                                  Feedback: <span className="text-gray-700">{answer.feedback}</span>
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Overall Feedback */}
+          {exam.feedback && (
+            <div className={`p-4 rounded-lg border ${
+              exam.is_passed ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+            }`}>
+              <h4 className="text-sm font-semibold text-gray-700 mb-1">Overall Feedback</h4>
+              <p className="text-sm text-gray-700">{exam.feedback}</p>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
+            {exam.status === 'pending' && (
+              <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200 text-center w-full">
+                <p className="text-sm text-yellow-700">This exam is awaiting grading by the evangelist.</p>
+                <p className="text-xs text-yellow-600 mt-1">You will receive feedback once graded.</p>
+              </div>
+            )}
+            {exam.status !== 'pending' && (
+              <button
+                onClick={() => window.print()}
+                className="flex-1 flex items-center justify-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+              >
+                <FaPrint className="mr-2" />
+                Print
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="flex-1 flex items-center justify-center px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // ============================================
 // MAIN COMPONENT
 // ============================================
 
-const Dashboard: React.FC = () => {
-  const { user, logout, isLoading: authLoading } = useAuth();
+const StudentDashboard: React.FC = () => {
+  
+  const { user } = useAuth();
   const { 
-    sermons, 
-    students, 
-    evangelists, 
-    examSubmissions,
-    loadingSermons,
-    loadingStudents,
+    examSubmissions, 
+    sermons,
     loadingExams,
-    refreshAllSermons,
-    refreshAllStudents,
+    loadingStudents,
+    loadingSermons,
     refreshExamSubmissions,
-    refreshEvangelists
+    refreshAllStudents,
+    refreshAllSermons,
   } = useAdmin();
   
-  const navigate = useNavigate();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'exams' | 'certificates' | 'sermons'>('overview');
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'pending' | 'passed' | 'failed'>('all');
+  const [studentStats, setStudentStats] = useState<StudentStats>({
+    totalExams: 0,
+    completedExams: 0,
+    pendingExams: 0,
+    averageScore: 0,
+    certificatesEarned: 0,
+    progress: 0,
+    passedExams: 0,
+    failedExams: 0,
+  });
+  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
+  const [showExamDetails, setShowExamDetails] = useState(false);
+  const [likedSermons, setLikedSermons] = useState<Set<number>>(new Set());
+  const [isLiking, setIsLiking] = useState<number | null>(null);
 
   // ============================================
-  // FETCH DATA ON MOUNT
+  // FETCH DATA
   // ============================================
   
   useEffect(() => {
     const loadData = async () => {
+      setIsLoading(true);
       try {
         await Promise.all([
-          refreshAllSermons(),
-          refreshAllStudents(),
           refreshExamSubmissions(),
-          refreshEvangelists()
+          refreshAllStudents(),
+          refreshAllSermons()
         ]);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setIsLoading(false);
       }
     };
     loadData();
   }, []);
 
   // ============================================
-  // CLOSE DROPDOWN ON OUTSIDE CLICK
+  // COMPUTE USER-SPECIFIC DATA - ONLY LOGGED-IN USER
   // ============================================
   
+  // Get ONLY the logged-in user's exams
+  const userExams = examSubmissions.filter(
+    (exam: any) => exam.student === user?.id
+  ) as Exam[];
+
+  // Get user's sermons (sermons they have access to)
+  const userSermons = sermons || [];
+
+  // Get user's certificates (from exam submissions)
+  const userCertificates: Certificate[] = userExams
+    .filter((exam: any) => exam.status === 'graded' && exam.is_passed)
+    .map((exam: any, index: number) => ({
+      id: `cert-${exam.id}`,
+      title: exam.sermon_title || 'Certificate',
+      issuedDate: exam.submitted_at || new Date().toISOString(),
+      certificateNumber: `DES-2026-${String(index + 1).padStart(3, '0')}`,
+      status: 'issued' as const,
+      grade: exam.percentage >= 80 ? 'A' : exam.percentage >= 70 ? 'B' : 'C',
+    }));
+
+  // Compute stats for logged-in user
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    const total = userExams.length;
+    const completed = userExams.filter((e: any) => e.status === 'graded' || e.status === 'reviewed').length;
+    const pending = userExams.filter((e: any) => e.status === 'pending').length;
+    
+    const gradedExams = userExams.filter((e: any) => e.status === 'graded' || e.status === 'reviewed');
+    const avgScore = gradedExams.length > 0 
+      ? gradedExams.reduce((acc: number, e: any) => acc + (e.percentage || 0), 0) / gradedExams.length 
+      : 0;
+
+    const passedExams = gradedExams.filter((e: any) => e.is_passed).length;
+    const failedExams = gradedExams.filter((e: any) => !e.is_passed).length;
+
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    setStudentStats({
+      totalExams: total,
+      completedExams: completed,
+      pendingExams: pending,
+      averageScore: avgScore,
+      certificatesEarned: userCertificates.length,
+      progress: progress,
+      passedExams: passedExams,
+      failedExams: failedExams,
+    });
+  }, [userExams]);
 
   // ============================================
-  // PUBLIC STATS FROM ALL DATA
+  // FILTER DATA FOR LOGGED-IN USER
   // ============================================
 
-  const publicStats = {
-    totalSermons: sermons?.length || 0,
-    totalStudents: students?.length || 0,
-    totalEvangelists: evangelists?.length || 0,
-    pendingExams: examSubmissions?.filter((e: any) => e.status === 'pending').length || 0,
-    certificatesIssued: students?.reduce((acc: number, s: any) => acc + (s.certificates_earned || 0), 0) || 0,
-    totalViews: sermons?.reduce((acc: number, s: any) => acc + (s.views || 0), 0) || 0,
-    totalLikes: sermons?.reduce((acc: number, s: any) => acc + (s.likes || 0), 0) || 0,
-  };
+  const filteredExams = userExams.filter((exam: any) => {
+    const matchesSearch = exam.sermon_title?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' ||
+      (filterStatus === 'completed' && (exam.status === 'graded' || exam.status === 'reviewed')) ||
+      (filterStatus === 'pending' && exam.status === 'pending') ||
+      (filterStatus === 'passed' && exam.status === 'graded' && exam.is_passed) ||
+      (filterStatus === 'failed' && exam.status === 'graded' && !exam.is_passed);
+    return matchesSearch && matchesStatus;
+  });
 
-  // ============================================
-  // PUBLIC RECENT SERMONS
-  // ============================================
-
-  const recentSermons: RecentSermon[] = (sermons || [])
-    .slice(0, 6)
-    .map((sermon: any) => ({
-      id: String(sermon.id),
-      title: sermon.title || 'Untitled Sermon',
-      topic: sermon.topic || 'General',
-      author: sermon.author_name || 'Unknown',
-      date: sermon.published_at || sermon.created_at || new Date().toISOString(),
-      views: sermon.views || 0,
-      likes: sermon.likes || 0,
-      shares: sermon.shares || 0,
-      status: sermon.status === 'published' ? 'ongoing' : 
-               sermon.status === 'draft' ? 'new' : 'completed'
-    }));
-
-  // ============================================
-  // PUBLIC RECENT ACTIVITIES
-  // ============================================
-
-  const recentActivities = (sermons || [])
-    .slice(0, 10)
-    .map((sermon: any) => ({
-      id: sermon.id,
-      title: sermon.title || 'Untitled Sermon',
-      type: sermon.status === 'published' ? 'published' : 'created',
-      timestamp: sermon.published_at || sermon.created_at || new Date().toISOString(),
-      author: sermon.author_name || 'Unknown',
-      views: sermon.views || 0,
-      likes: sermon.likes || 0,
-    }));
-
-  // ============================================
-  // HANDLERS
-  // ============================================
-
-  const handleLogout = async () => {
-    setIsDropdownOpen(false);
-    await logout();
-    navigate('/login');
-  };
-
-  const handleViewSermon = (sermonId: string, sermonTitle: string) => {
-    navigate(`/join/sermon-${sermonId}?sermon=${encodeURIComponent(sermonTitle)}`);
-  };
+  const filteredSermons = userSermons.filter((sermon: any) => {
+    const matchesSearch = sermon.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          sermon.author_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          sermon.topic?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
 
   // ============================================
   // HELPERS
   // ============================================
 
-  const getStatusBadge = (status: string) => {
+  const getStatusIcon = (status: string) => {
     switch(status) {
-      case 'new':
-        return <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">New</span>;
-      case 'ongoing':
-        return <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">Ongoing</span>;
-      case 'completed':
-        return <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded-full">Completed</span>;
+      case 'graded':
+      case 'reviewed':
+        return <FaCheckCircle className="text-green-500" />;
+      case 'pending':
+        return <FaClock className="text-yellow-500" />;
       default:
-        return null;
+        return <FaExclamationCircle className="text-red-500" />;
     }
   };
 
-  const getUserInitials = () => {
-    if (!user?.full_name) return '?';
-    return user.full_name
-      .split(' ')
-      .map((name: string) => name[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
+  const getStatusLabel = (exam: Exam) => {
+    if (exam.status === 'pending') return 'Pending';
+    if (exam.status === 'reviewed') return 'Reviewed';
+    if (exam.status === 'graded') {
+      return exam.is_passed ? 'Passed' : 'Failed';
+    }
+    return 'Unknown';
   };
 
-  const getProfilePicture = (): string | undefined => {
-    if (user?.profile?.profile_picture) {
-      return user.profile.profile_picture;
+  const getStatusBadgeClass = (exam: Exam) => {
+    if (exam.status === 'pending') return 'bg-yellow-100 text-yellow-700';
+    if (exam.status === 'reviewed') return 'bg-blue-100 text-blue-700';
+    if (exam.status === 'graded') {
+      return exam.is_passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
     }
-    return undefined;
+    return 'bg-gray-100 text-gray-700';
+  };
+
+  const getGradeColor = (percentage: number) => {
+    if (percentage >= 80) return 'text-green-600';
+    if (percentage >= 60) return 'text-blue-600';
+    if (percentage >= 40) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const getGradeLabel = (percentage: number) => {
+    if (percentage >= 80) return 'Excellent';
+    if (percentage >= 70) return 'Very Good';
+    if (percentage >= 60) return 'Good';
+    if (percentage >= 50) return 'Satisfactory';
+    if (percentage >= 30) return 'Pass';
+    return 'Needs Improvement';
+  };
+
+  const getSermonProgress = (sermonId: number) => {
+    const exam = userExams.find((e: any) => e.sermon === sermonId);
+    if (!exam) return 0;
+    if (exam.status === 'graded' || exam.status === 'reviewed') return 100;
+    return 50;
+  };
+
+  const getSermonStatus = (sermonId: number) => {
+    const exam = userExams.find((e: any) => e.sermon === sermonId);
+    if (!exam) return 'not_started';
+    if (exam.status === 'pending') return 'in_progress';
+    if (exam.status === 'graded' || exam.status === 'reviewed') return 'completed';
+    return 'not_started';
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -278,30 +511,67 @@ const Dashboard: React.FC = () => {
     return date.toLocaleDateString();
   };
 
-  const getRoleDisplayName = () => {
-    const role = user?.role || 'student';
-    const names: Record<string, string> = {
-      admin: 'Administrator',
-      evangelist: 'Evangelist',
-      student: 'Student',
-      super_admin: 'Super Admin',
-      church_admin: 'Church Admin'
-    };
-    return names[role] || 'Member';
+  // ============================================
+  // HANDLERS
+  // ============================================
+
+  const handleLike = async (sermonId: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isLiking === sermonId) return;
+
+    setIsLiking(sermonId);
+    
+    try {
+      const isLiked = likedSermons.has(sermonId);
+      
+      if (isLiked) {
+        setLikedSermons(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(sermonId);
+          return newSet;
+        });
+        toast.success('Unliked sermon');
+      } else {
+        setLikedSermons(prev => new Set(prev).add(sermonId));
+        toast.success('Liked sermon!');
+      }
+    } catch (error: any) {
+      console.error('Error toggling like:', error);
+      toast.error('Failed to like sermon');
+    } finally {
+      setIsLiking(null);
+    }
   };
 
-  const userRole = user?.role || 'student';
-  const navigationItems = getNavigationItems(userRole);
+  const handleShare = async (sermonId: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const url = `${window.location.origin}/sermons/${sermonId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Link copied to clipboard!');
+    } catch (error) {
+      toast.error('Failed to copy link');
+    }
+  };
+
+  const handleViewExamDetails = (exam: Exam) => {
+    setSelectedExam(exam);
+    setShowExamDetails(true);
+  };
 
   // ============================================
-  // LOADING STATE
+  // RENDER LOADING
   // ============================================
 
-  if (loadingSermons || loadingStudents || loadingExams) {
+  if (isLoading || loadingExams || loadingStudents || loadingSermons) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <FaSpinner className="animate-spin text-4xl text-cyan-500 mx-auto mb-4" />
           <p className="text-gray-500">Loading your dashboard...</p>
         </div>
       </div>
@@ -313,449 +583,706 @@ const Dashboard: React.FC = () => {
   // ============================================
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <Link to="/dashboard" className="flex items-center">
-                <span className="text-xl font-bold text-cyan-600">Digital Evangelism</span>
-              </Link>
+    <div className="space-y-6">
+      {/* Exam Detail Modal */}
+      <ExamDetailModal
+        isOpen={showExamDetails}
+        onClose={() => {
+          setShowExamDetails(false);
+          setSelectedExam(null);
+        }}
+        exam={selectedExam}
+      />
+
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-gray-900">Student Dashboard</h1>
+          <p className="mt-1 text-gray-600">Track your learning progress and certifications</p>
+          <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-gray-500">
+            <span className="flex items-center">
+              <FaUser className="mr-1 text-gray-400" />
+              {user?.full_name || 'Student'}
+            </span>
+            <span className="flex items-center">
+              <FaBook className="mr-1 text-gray-400" />
+              {userExams.length} exams attempted
+            </span>
+            <span className="flex items-center">
+              <FaAward className="mr-1 text-gray-400" />
+              {studentStats.certificatesEarned} certificates
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Link to="/sermons" className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2">
+            <FaBookOpen />
+            <span>Browse Sermons</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Stats Grid - Only Logged-in User's Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-cyan-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Exams Completed</p>
+              <p className="text-2xl font-bold text-gray-900">{studentStats.completedExams}</p>
             </div>
+            <div className="p-3 bg-green-100 rounded-full">
+              <FaGraduationCap className="text-green-600 text-xl" />
+            </div>
+          </div>
+          <div className="mt-2 text-sm text-gray-500">
+            of {studentStats.totalExams} total
+          </div>
+        </div>
 
-            <div className="flex items-center space-x-4">
-              <div className="relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center space-x-3 focus:outline-none focus:ring-2 focus:ring-cyan-500 rounded-full p-1 hover:bg-gray-100 transition-colors"
-                >
-                  {getProfilePicture() ? (
-                    <img
-                      src={getProfilePicture()}
-                      alt={user?.full_name || 'User'}
-                      className="w-10 h-10 rounded-full object-cover border-2 border-cyan-500"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm border-2 border-cyan-500">
-                      {getUserInitials()}
-                    </div>
-                  )}
-                  
-                  <div className="hidden md:block text-left">
-                    <p className="text-sm font-medium text-gray-900">
-                      {user?.full_name || 'User'}
-                    </p>
-                    <p className="text-xs text-gray-500 capitalize">
-                      {getRoleDisplayName()}
-                    </p>
-                  </div>
-                  
-                  <span className="hidden md:block text-gray-400 text-sm">
-                    {isDropdownOpen ? '▲' : '▼'}
-                  </span>
-                </button>
+        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Average Score</p>
+              <p className="text-2xl font-bold text-gray-900">{studentStats.averageScore.toFixed(1)}%</p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-full">
+              <FaChartLine className="text-blue-600 text-xl" />
+            </div>
+          </div>
+          <div className="mt-2 text-sm text-gray-500">
+            {studentStats.passedExams} passed / {studentStats.failedExams} failed
+          </div>
+        </div>
 
-                {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-80 max-h-[80vh] overflow-y-auto bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 scrollbar-thin scrollbar-thumb-cyan-300 scrollbar-track-gray-100">
-                    <style>{`
-                      .scrollbar-thin::-webkit-scrollbar {
-                        width: 6px;
-                      }
-                      .scrollbar-thin::-webkit-scrollbar-track {
-                        background: #f3f4f6;
-                        border-radius: 3px;
-                      }
-                      .scrollbar-thin::-webkit-scrollbar-thumb {
-                        background: #c4d1d9;
-                        border-radius: 3px;
-                      }
-                      .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-                        background: #a0b3c4;
-                      }
-                    `}</style>
+        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Certificates</p>
+              <p className="text-2xl font-bold text-gray-900">{studentStats.certificatesEarned}</p>
+            </div>
+            <div className="p-3 bg-yellow-100 rounded-full">
+              <FaAward className="text-yellow-600 text-xl" />
+            </div>
+          </div>
+          <div className="mt-2 text-sm text-gray-500">
+            {studentStats.pendingExams} exams pending
+          </div>
+        </div>
 
-                    {/* User Info */}
-                    <div className="px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
-                      <div className="flex items-center space-x-3">
-                        {getProfilePicture() ? (
-                          <img
-                            src={getProfilePicture()}
-                            alt={user?.full_name || 'User'}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-cyan-500"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-white font-bold text-lg border-2 border-cyan-500">
-                            {getUserInitials()}
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {user?.full_name || 'User'}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {user?.email || 'No email'}
-                          </p>
-                          <p className="text-xs text-cyan-600 capitalize">
-                            {getRoleDisplayName()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Navigation Items with Scroll */}
-                    <div className="py-1">
-                      {navigationItems.map((item, index) => (
-                        <Link
-                          key={index}
-                          to={item.to}
-                          className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-cyan-600 transition-colors group"
-                          onClick={() => setIsDropdownOpen(false)}
-                        >
-                          <span className="mr-3 text-gray-400 group-hover:text-cyan-500 transition-colors text-lg">
-                            {item.icon}
-                          </span>
-                          <div className="flex-1">
-                            <span className="font-medium">{item.label}</span>
-                            {item.description && (
-                              <p className="text-xs text-gray-400 group-hover:text-gray-500">
-                                {item.description}
-                              </p>
-                            )}
-                          </div>
-                          <FaChevronRight className="text-gray-300 group-hover:text-cyan-400 text-xs transition-colors" />
-                        </Link>
-                      ))}
-                    </div>
-
-                    {/* Divider */}
-                    <div className="border-t border-gray-100 my-1"></div>
-
-                    {/* Logout */}
-                    <button
-                      onClick={handleLogout}
-                      disabled={authLoading}
-                      className="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 group"
-                    >
-                      <FaSignOutAlt className="mr-3 text-red-400 group-hover:text-red-500 transition-colors text-lg" />
-                      <span className="font-medium">{authLoading ? 'Logging out...' : 'Logout'}</span>
-                      {authLoading && <FaSpinner className="ml-2 animate-spin" />}
-                    </button>
-
-                    {/* Scroll Indicator */}
-                    <div className="px-4 py-2 text-center border-t border-gray-100 sticky bottom-0 bg-white">
-                      <div className="flex items-center justify-center gap-1 text-xs text-gray-400">
-                        <FaChevronUp className="text-gray-300" size={10} />
-                        <span>Scroll for more</span>
-                        <FaChevronDown className="text-gray-300" size={10} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Progress</p>
+              <p className="text-2xl font-bold text-gray-900">{studentStats.progress}%</p>
+            </div>
+            <div className="p-3 bg-purple-100 rounded-full">
+              <FaBookOpen className="text-purple-600 text-xl" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-purple-600 rounded-full h-2 transition-all"
+                style={{ width: `${studentStats.progress}%` }}
+              />
             </div>
           </div>
         </div>
-      </nav>
+      </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {/* Welcome Banner */}
-          <div className="bg-gradient-to-r from-white-600 to-white-600 rounded-2xl p-8 text-dark">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-serif font-bold">
-                  Welcome back, {user?.full_name || 'Believer'}! 
-                </h1>
-                <p className="mt-2 text-dark-100">
-                  {userRole === 'admin' && 'Manage the evangelism network effectively'}
-                  {userRole === 'evangelist' && 'Continue spreading the Gospel through your group'}
-                  {userRole === 'student' && 'Grow in faith through learning and exams'}
-                  {userRole === 'super_admin' && 'Oversee the entire evangelism platform'}
-                  {userRole === 'church_admin' && 'Manage your church\'s evangelism activities'}
-                  {!userRole && 'Join the Digital Evangelism community'}
-                </p>
-                <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-dark-100">
-                  <span className="flex items-center">
-                    <FaUser className="mr-1" /> {getRoleDisplayName()}
-                  </span>
-                  <span className="flex items-center">
-                    <FaCalendarAlt className="mr-1" /> 
-                    Member since {user?.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'N/A'}
-                  </span>
-                </div>
-              </div>
-              <div className="hidden md:block">
-                <span className="text-6xl opacity-20">✝</span>
-              </div>
-            </div>
+      {/* Tabs */}
+      <div className="bg-white rounded-xl shadow-md p-2">
+        <nav className="flex flex-wrap gap-2">
+          {['overview', 'exams', 'certificates', 'sermons'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as any)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === tab
+                  ? 'bg-cyan-600 text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </nav>
+      </div>
 
-            {/* Public Stats for User */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/20">
-              <div>
-                <p className="text-sm text-dark-100">Total Sermons</p>
-                <p className="text-2xl font-bold">{publicStats.totalSermons}</p>
-              </div>
-              <div>
-                <p className="text-sm text-dark-100">Total Students</p>
-                <p className="text-2xl font-bold">{publicStats.totalStudents}</p>
-              </div>
-              <div>
-                <p className="text-sm text-dark-100">Pending Exams</p>
-                <p className="text-2xl font-bold">{publicStats.pendingExams}</p>
-              </div>
-              <div>
-                <p className="text-sm text-dark-100">Total Views</p>
-                <p className="text-2xl font-bold">{publicStats.totalViews}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow p-6 border-l-4 border-cyan-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Sermons</p>
-                  <p className="text-2xl font-bold text-gray-900">{publicStats.totalSermons}</p>
-                </div>
-                <div className="p-3 bg-cyan-100 rounded-full">
-                  <FaBook className="text-cyan-600 text-xl" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <span className="text-xs text-gray-500">
-                  {publicStats.totalSermons > 0 ? `${publicStats.totalSermons} sermons shared` : 'No sermons yet'}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow p-6 border-l-4 border-blue-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Students</p>
-                  <p className="text-2xl font-bold text-gray-900">{publicStats.totalStudents}</p>
-                </div>
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <FaUserGraduate className="text-blue-600 text-xl" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <span className="text-xs text-gray-500">
-                  {publicStats.totalStudents > 0 ? `${publicStats.totalStudents} students enrolled` : 'No students yet'}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow p-6 border-l-4 border-yellow-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Pending Exams</p>
-                  <p className="text-2xl font-bold text-gray-900">{publicStats.pendingExams}</p>
-                </div>
-                <div className="p-3 bg-yellow-100 rounded-full">
-                  <FaClock className="text-yellow-600 text-xl" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <span className="text-xs text-yellow-600">
-                  {publicStats.pendingExams > 0 ? `${publicStats.pendingExams} need grading` : 'All graded'}
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow p-6 border-l-4 border-purple-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Views</p>
-                  <p className="text-2xl font-bold text-gray-900">{publicStats.totalViews}</p>
-                </div>
-                <div className="p-3 bg-purple-100 rounded-full">
-                  <FaEye className="text-purple-600 text-xl" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <span className="text-xs text-purple-600">
-                  {publicStats.totalViews > 0 ? `${publicStats.totalViews} views` : 'No views yet'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Sermons - Public */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                <FaBible className="mr-2 text-cyan-500" />
-                Recent Sermons
-              </h2>
-              <Link to="/sermons" className="text-sm text-cyan-600 hover:text-cyan-700 font-medium flex items-center">
-                View All <FaArrowRight className="ml-1" />
-              </Link>
-            </div>
-            
-            {recentSermons.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {recentSermons.map((sermon) => (
-                  <div key={sermon.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-6 border-l-4 border-cyan-500">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-3">
-                        <div className="p-2 bg-cyan-100 rounded-lg">
-                          <FaBible className="text-cyan-600" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-gray-900 line-clamp-1">{sermon.title}</h4>
-                          <p className="text-sm text-gray-600">Topic: {sermon.topic}</p>
-                          <p className="text-xs text-gray-500 mt-1">By {sermon.author}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        {getStatusBadge(sermon.status)}
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between text-sm">
-                      <span className="text-gray-500 flex items-center">
-                        <FaEye className="inline mr-1 text-gray-400" />
-                        {sermon.views} views
-                      </span>
-                      <span className="text-gray-500 flex items-center">
-                        <FaHeart className="inline mr-1 text-red-400" />
-                        {sermon.likes} likes
-                      </span>
-                      <span className="text-gray-500">
-                        <FaCalendarAlt className="inline mr-1 text-gray-400" />
-                        {new Date(sermon.date).toLocaleDateString()}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 flex space-x-2">
-                      <button
-                        onClick={() => handleViewSermon(sermon.id, sermon.title)}
-                        className="flex-1 px-3 py-2 bg-cyan-50 hover:bg-cyan-100 text-cyan-600 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        View Sermon
-                      </button>
-                      <button className="px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-lg text-sm font-medium transition-colors">
-                        <FaShare />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl shadow-md p-8 text-center">
-                <FaBook className="text-4xl text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No sermons available</p>
-                <Link to="/admin/create-sermon" className="inline-block mt-2 text-cyan-600 hover:text-cyan-700 font-medium">
-                  Create your first sermon
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Recent Activity - Public */}
+      {/* ============================================
+          OVERVIEW TAB
+          ============================================ */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* Recent Exams - Only Logged-in User */}
           <div className="bg-white rounded-xl shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-              <FaBell className="mr-2 text-cyan-500" />
-              Recent Activity
-            </h2>
-            <div className="space-y-4">
-              {recentActivities.length > 0 ? (
-                recentActivities.map((activity: any) => (
-                  <div key={activity.id} className="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors border-b border-gray-100 last:border-0">
-                    <div className="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center flex-shrink-0">
-                      <FaBible className="text-cyan-600" />
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <FaFileAlt className="mr-2 text-cyan-500" />
+                Your Recent Exams
+              </h3>
+              <button
+                onClick={() => setActiveTab('exams')}
+                className="text-sm text-cyan-600 hover:text-cyan-700 font-medium flex items-center"
+              >
+                View All
+                <FaArrowRight className="ml-1 text-xs" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {userExams.slice(0, 3).map((exam: any) => (
+                <div 
+                  key={exam.id} 
+                  className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors border-l-4 border-cyan-200 cursor-pointer"
+                  onClick={() => handleViewExamDetails(exam)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-gray-100 rounded-lg">
+                      <FaFileAlt className="text-gray-600" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {activity.type === 'published' ? 'Published' : 'Created'}: "{activity.title}"
-                        </p>
-                        {activity.views > 0 && (
-                          <span className="text-xs text-gray-400 flex items-center whitespace-nowrap">
-                            <FaEye className="mr-1 text-xs" />
-                            {activity.views}
-                          </span>
-                        )}
-                        {activity.likes > 0 && (
-                          <span className="text-xs text-gray-400 flex items-center whitespace-nowrap">
-                            <FaHeart className="mr-1 text-red-400 text-xs" />
-                            {activity.likes}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs text-gray-500">by {activity.author || 'Unknown'}</p>
-                        <span className="text-xs text-gray-300">•</span>
-                        <p className="text-xs text-gray-400">{formatDate(activity.timestamp)}</p>
-                      </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{exam.sermon_title}</p>
+                      <p className="text-xs text-gray-500 flex items-center">
+                        <FaCalendar className="mr-1 text-gray-400" />
+                        Submitted: {formatDate(exam.submitted_at)}
+                      </p>
                     </div>
-                    <button 
-                      onClick={() => handleViewSermon(activity.id, activity.title)}
-                      className="text-xs text-cyan-600 hover:text-cyan-700 font-medium cursor-pointer whitespace-nowrap flex-shrink-0"
-                    >
-                      View
-                    </button>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-6 text-gray-500">
-                  <p>No recent activity</p>
+                  <div className="flex items-center space-x-4">
+                    {exam.status !== 'pending' ? (
+                      <div className="text-right">
+                        <div className={`font-bold ${getGradeColor(exam.percentage || 0)}`}>
+                          {exam.percentage?.toFixed(1) || 0}%
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {exam.total_score || 0}/{exam.max_possible_score || 0}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">
+                        Pending
+                      </span>
+                    )}
+                    <div className="flex items-center space-x-1">
+                      {getStatusIcon(exam.status)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {userExams.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No exams attempted yet</p>
+                  <Link to="/sermons" className="text-cyan-600 hover:text-cyan-700 font-medium text-sm mt-2 inline-block">
+                    Browse Sermons
+                    <FaArrowRight className="inline ml-1 text-xs" />
+                  </Link>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Quick Access Cards - Role Based */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {userRole === 'admin' || userRole === 'super_admin' ? (
-              <>
-                <Link to="/admin/users" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
-                  <FaUsers className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                  <p className="text-sm font-medium text-gray-700">User Management</p>
-                </Link>
-                <Link to="/admin/subscriptions" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
-                  <FaNewspaper className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                  <p className="text-sm font-medium text-gray-700">Subscriptions</p>
-                </Link>
-              </>
-            ) : null}
-            
-            {userRole === 'evangelist' && (
-              <Link to="/ev/dashboard" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
-                <FaChartBar className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                <p className="text-sm font-medium text-gray-700">Evangelist Dashboard</p>
-              </Link>
-            )}
-            
-            {userRole === 'student' && (
-              <Link to="/students" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
-                <FaGraduationCap className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                <p className="text-sm font-medium text-gray-700">Student Dashboard</p>
-              </Link>
-            )}
-            
-            {/* <Link to="/admin/create-sermon" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
-              <FaBook className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-sm font-medium text-gray-700">Create Sermon</p>
-            </Link>
-             */}
-            <Link to="/certificates" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
-              <FaCertificate className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-sm font-medium text-gray-700">My Certificates</p>
-            </Link>
-            
-            <Link to="/profile" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
-              <FaUser className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-sm font-medium text-gray-700">My Profile</p>
-            </Link>
+          {/* Available Sermons */}
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <FaBookOpen className="mr-2 text-cyan-500" />
+                Available Sermons
+              </h3>
+              <button
+                onClick={() => setActiveTab('sermons')}
+                className="text-sm text-cyan-600 hover:text-cyan-700 font-medium flex items-center"
+              >
+                View All
+                <FaArrowRight className="ml-1 text-xs" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {userSermons.slice(0, 4).map((sermon: any) => {
+                const progress = getSermonProgress(sermon.id);
+                const status = getSermonStatus(sermon.id);
+                return (
+                  <div key={sermon.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
+                    <div>
+                      <p className="font-medium text-gray-900">{sermon.title}</p>
+                      <p className="text-xs text-gray-500 flex items-center">
+                        <FaUser className="mr-1 text-gray-400" />
+                        {sermon.author_name || 'Unknown'}
+                      </p>
+                      {sermon.topic && (
+                        <span className="inline-block mt-1 text-xs font-medium text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded">
+                          {sermon.topic}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      {progress > 0 && (
+                        <div className="text-xs text-gray-500">
+                          {progress}%
+                        </div>
+                      )}
+                      <Link
+                        to={`/sermons/${sermon.id}`}
+                        className="text-sm text-cyan-600 hover:text-cyan-700 font-medium flex items-center"
+                      >
+                        {status === 'completed' ? 'Review' : status === 'in_progress' ? 'Continue' : 'Start'}
+                        <FaArrowRight className="ml-1 text-xs" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+              {userSermons.length === 0 && (
+                <div className="col-span-2 text-center py-8 text-gray-500">
+                  <p>No sermons available</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ============================================
+          EXAMS TAB - Only Logged-in User's Exams
+          ============================================ */}
+      {activeTab === 'exams' && (
+        <div className="space-y-4">
+          {/* Search and Filter */}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaSearch className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search your exams by sermon title..."
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <select
+                className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+              >
+                <option value="all">All Exams</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="passed">Passed</option>
+                <option value="failed">Failed</option>
+              </select>
+              <button className="p-2.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                <FaFilter className="text-gray-600" />
+              </button>
+            </div>
+          </div>
+
+          {/* Exams Cards - Only Logged-in User */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredExams.map((exam: any) => (
+              <div 
+                key={exam.id} 
+                className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-6 border-l-4 border-cyan-500 cursor-pointer hover:scale-[1.02] transition-transform"
+                onClick={() => handleViewExamDetails(exam)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-semibold text-gray-900">{exam.sermon_title}</h4>
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusBadgeClass(exam)}`}>
+                        {getStatusLabel(exam)}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-gray-500">
+                      <span className="flex items-center">
+                        <FaCalendar className="mr-1 text-gray-400" />
+                        {formatDate(exam.submitted_at)}
+                      </span>
+                      {exam.time_taken > 0 && (
+                        <span className="flex items-center">
+                          <FaClock className="mr-1 text-gray-400" />
+                          {exam.time_taken} min
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    {exam.status !== 'pending' ? (
+                      <div className="text-right">
+                        <div className={`text-2xl font-bold ${getGradeColor(exam.percentage || 0)}`}>
+                          {exam.percentage?.toFixed(1) || 0}%
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {exam.total_score || 0}/{exam.max_possible_score || 0}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {getGradeLabel(exam.percentage || 0)}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="px-3 py-1 bg-yellow-100 text-yellow-700 text-sm rounded-full">
+                        Pending
+                      </span>
+                    )}
+                    {getStatusIcon(exam.status)}
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs text-gray-500">
+                    {exam.answers?.length || 0} questions
+                  </span>
+                  {exam.status === 'pending' && (
+                    <span className="text-xs text-yellow-600">Awaiting grading</span>
+                  )}
+                  {exam.status === 'graded' && exam.feedback && (
+                    <span className="text-xs text-gray-500 flex items-center">
+                      <FaComment className="mr-1" />
+                      {exam.feedback.substring(0, 30)}...
+                    </span>
+                  )}
+                </div>
+                <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+                  <button 
+                    className="text-sm text-cyan-600 hover:text-cyan-700 font-medium flex items-center"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewExamDetails(exam);
+                    }}
+                  >
+                    <FaEye className="mr-1" />
+                    View Details
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {filteredExams.length === 0 && (
+            <div className="bg-white rounded-xl shadow-md p-12 text-center">
+              <FaFileAlt className="text-4xl text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">
+                {searchTerm ? 'No exams match your search' : 'You haven\'t attempted any exams yet'}
+              </p>
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="mt-4 text-cyan-600 hover:text-cyan-700 font-medium"
+                >
+                  Clear Search
+                </button>
+              )}
+              {!searchTerm && (
+                <Link to="/sermons" className="text-cyan-600 hover:text-cyan-700 font-medium inline-block mt-2">
+                  Browse Sermons
+                  <FaArrowRight className="inline ml-1 text-xs" />
+                </Link>
+              )}
+            </div>
+          )}
+
+          {/* Footer Stats - Only Logged-in User */}
+          {filteredExams.length > 0 && (
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500 bg-white rounded-xl shadow-md px-6 py-3">
+              <span>Showing {filteredExams.length} of {userExams.length} of your exams</span>
+              <div className="flex flex-wrap items-center gap-4">
+                <span className="flex items-center">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                  Passed: {studentStats.passedExams}
+                </span>
+                <span className="flex items-center">
+                  <span className="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
+                  Failed: {studentStats.failedExams}
+                </span>
+                <span className="flex items-center">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full mr-1"></span>
+                  Pending: {studentStats.pendingExams}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================
+          CERTIFICATES TAB - Only Logged-in User
+          ============================================ */}
+      {activeTab === 'certificates' && (
+        <div className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaSearch className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search your certificates..."
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {userCertificates.map((cert) => (
+              <div key={cert.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-6 border-l-4 border-yellow-500">
+                <div className="flex items-center justify-between">
+                  <div className="p-3 bg-yellow-100 rounded-full">
+                    <FaAward className="text-yellow-600 text-2xl" />
+                  </div>
+                  <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                    {cert.status}
+                  </span>
+                </div>
+                <h4 className="mt-3 font-semibold text-gray-900">{cert.title}</h4>
+                <p className="text-sm text-gray-600">
+                  Certificate #{cert.certificateNumber}
+                </p>
+                {cert.grade && (
+                  <p className="text-sm text-gray-600">
+                    Grade: <span className="font-bold text-cyan-600">{cert.grade}</span>
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-1 flex items-center">
+                  <FaCalendar className="mr-1 text-gray-400" />
+                  Issued: {formatDate(cert.issuedDate)}
+                </p>
+                <div className="mt-4 flex space-x-2">
+                  <Link
+                    to={`/certificates/${cert.id}`}
+                    className="flex-1 text-center text-sm bg-cyan-50 text-cyan-600 hover:text-cyan-700 py-2 rounded-lg transition-colors"
+                  >
+                    View Certificate
+                  </Link>
+                  <button className="flex-1 text-center text-sm bg-gray-100 text-gray-600 hover:text-gray-700 py-2 rounded-lg transition-colors">
+                    Download
+                  </button>
+                </div>
+              </div>
+            ))}
+            {userCertificates.length === 0 && (
+              <div className="col-span-3 bg-white rounded-xl shadow-md p-12 text-center">
+                <FaAward className="text-4xl text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No certificates earned yet</p>
+                <p className="text-sm text-gray-400">Complete exams to earn certificates</p>
+                <Link to="/sermons" className="text-cyan-600 hover:text-cyan-700 font-medium inline-block mt-2">
+                  Browse Sermons
+                  <FaArrowRight className="inline ml-1 text-xs" />
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================
+          SERMONS TAB
+          ============================================ */}
+      {activeTab === 'sermons' && (
+        <div className="space-y-4">
+          {/* Search */}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaSearch className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search sermons by title, topic or author..."
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button className="p-2.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+              <FaFilter className="text-gray-600" />
+            </button>
+          </div>
+
+          {/* Sermons Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredSermons.map((sermon: any) => {
+              const isLiked = likedSermons.has(sermon.id);
+              const isLikingThis = isLiking === sermon.id;
+              const progress = getSermonProgress(sermon.id);
+              
+              return (
+                <div key={sermon.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border-l-4 border-cyan-500 hover:scale-[1.02]">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                        sermon.status === 'published' 
+                          ? 'bg-green-100 text-green-700' 
+                          : sermon.status === 'draft'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {sermon.status || 'Draft'}
+                      </span>
+                      <span className="text-xs text-gray-400 flex items-center">
+                        <FaEye className="mr-1" />
+                        {sermon.views || 0}
+                      </span>
+                    </div>
+
+                    <Link to={`/sermons/${sermon.id}`}>
+                      <h3 className="text-xl font-semibold text-gray-900 hover:text-cyan-600 transition-colors line-clamp-2">
+                        {sermon.title}
+                      </h3>
+                    </Link>
+
+                    {sermon.topic && (
+                      <span className="inline-block mt-1 text-xs font-medium text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded">
+                        {sermon.topic}
+                      </span>
+                    )}
+
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-sm text-gray-600 flex items-center">
+                        <FaUser className="mr-1 text-gray-400" />
+                        {sermon.author_name || 'Unknown'}
+                      </span>
+                      <span className="text-xs text-gray-500 flex items-center">
+                        <FaCalendar className="mr-1 text-gray-400" />
+                        {sermon.created_at ? new Date(sermon.created_at).toLocaleDateString() : 'N/A'}
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    {progress > 0 && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                          <span>Your Progress</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div
+                            className="bg-cyan-600 rounded-full h-1.5 transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {sermon.content && (
+                      <p className="mt-3 text-gray-600 line-clamp-3 text-sm">
+                        {sermon.content.substring(0, 150)}...
+                      </p>
+                    )}
+
+                    {sermon.scripture && (
+                      <div className="mt-2 p-2 bg-cyan-50 rounded border border-cyan-100">
+                        <p className="text-xs text-cyan-700 font-serif italic">
+                          {sermon.scripture}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                      <div className="flex items-center space-x-4">
+                        <button
+                          onClick={(e) => handleLike(sermon.id, e)}
+                          disabled={isLikingThis}
+                          className={`flex items-center space-x-1 transition-colors text-sm ${
+                            isLiked
+                              ? 'text-red-500 hover:text-red-600'
+                              : 'text-gray-500 hover:text-red-500'
+                          } ${isLikingThis ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {isLikingThis ? (
+                            <FaSpinner className="animate-spin" />
+                          ) : (
+                            <FaHeart className={isLiked ? 'fill-current' : ''} />
+                          )}
+                          <span>{sermon.likes + (isLiked ? 1 : 0)}</span>
+                        </button>
+
+                        <Link
+                          to={`/sermons/${sermon.id}#comments`}
+                          className="flex items-center space-x-1 text-gray-500 hover:text-blue-500 transition-colors text-sm"
+                        >
+                          <FaComment />
+                          <span>{sermon.questions_count || 0}</span>
+                        </Link>
+
+                        <button
+                          onClick={(e) => handleShare(sermon.id, e)}
+                          className="flex items-center space-x-1 text-gray-500 hover:text-green-500 transition-colors text-sm"
+                        >
+                          <FaShare />
+                          <span>{sermon.shares || 0}</span>
+                        </button>
+                      </div>
+                      <Link
+                        to={`/sermons/${sermon.id}`}
+                        className="text-sm text-cyan-600 hover:text-cyan-700 font-medium flex items-center"
+                      >
+                        {progress === 100 ? 'Review' : progress > 0 ? 'Continue' : 'Start'}
+                        <FaArrowRight className="ml-1 text-xs" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {filteredSermons.length === 0 && (
+            <div className="text-center py-16 bg-white rounded-xl shadow-md">
+              <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FaBook className="text-4xl text-cyan-400" />
+              </div>
+              <p className="text-gray-500 font-medium">No sermons found</p>
+              <p className="text-sm text-gray-400 mt-1">
+                {searchTerm ? 'Try adjusting your search' : 'No sermons available'}
+              </p>
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="mt-4 text-cyan-600 hover:text-cyan-700 font-medium"
+                >
+                  Clear Search
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Footer Stats */}
+          {filteredSermons.length > 0 && (
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500 bg-white rounded-xl shadow-md px-6 py-3">
+              <span>Showing {filteredSermons.length} of {userSermons.length} sermons</span>
+              <div className="flex flex-wrap items-center gap-4">
+                <span className="flex items-center">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                  Completed: {userSermons.filter((s: any) => getSermonStatus(s.id) === 'completed').length}
+                </span>
+                <span className="flex items-center">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full mr-1"></span>
+                  In Progress: {userSermons.filter((s: any) => getSermonStatus(s.id) === 'in_progress').length}
+                </span>
+                <span className="flex items-center">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-1"></span>
+                  Not Started: {userSermons.filter((s: any) => getSermonStatus(s.id) === 'not_started').length}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Animation Styles */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
 
-export default Dashboard;
+export default StudentDashboard;
