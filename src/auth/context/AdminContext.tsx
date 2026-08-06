@@ -7,7 +7,6 @@ import {
   evangelistsAPI,
   groupsAPI,
   commentsAPI,
-  evangelismAPI,
   examAPI
 } from '../../services/api';
 import type { 
@@ -21,11 +20,6 @@ import type {
   Group,
   Comment,
   CommentStats,
-  EvangelismActivity,
-  EvangelismActivityStats,
-  SoulWinning,
-  SoulWinningStats,
-  EvangelismReport,
   ExamSubmission,
   ExamFilterParams,
   ExamStats,
@@ -70,15 +64,6 @@ interface AdminContextType {
   commentStats: CommentStats | null;
   loadingComments: boolean;
   commentError: string | null;
-  
-  // Evangelism
-  activities: EvangelismActivity[];
-  activityStats: EvangelismActivityStats | null;
-  souls: SoulWinning[];
-  soulStats: SoulWinningStats | null;
-  reports: EvangelismReport[];
-  loadingEvangelism: boolean;
-  evangelismError: string | null;
   
   // Exam Submissions
   examSubmissions: ExamSubmission[];
@@ -162,21 +147,6 @@ interface AdminContextType {
   deleteComment: (id: number) => Promise<void>;
   likeComment: (id: number) => Promise<void>;
   
-  // Evangelism Functions
-  refreshActivities: () => Promise<void>;
-  refreshSouls: () => Promise<void>;
-  refreshReports: () => Promise<void>;
-  refreshAllEvangelism: () => Promise<void>;
-  addActivity: (activity: EvangelismActivity) => void;
-  updateActivity: (id: number, activity: EvangelismActivity) => void;
-  deleteActivity: (id: number) => Promise<void>;
-  addSoul: (soul: SoulWinning) => void;
-  updateSoul: (id: number, soul: SoulWinning) => void;
-  deleteSoul: (id: number) => Promise<void>;
-  addReport: (report: EvangelismReport) => void;
-  updateReport: (id: number, report: EvangelismReport) => void;
-  deleteReport: (id: number) => Promise<void>;
-  
   // Exam Functions
   refreshExamSubmissions: (params?: ExamFilterParams) => Promise<void>;
   getSubmission: (id: number) => Promise<ExamSubmission>;
@@ -247,15 +217,6 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
 
-  // Evangelism
-  const [activities, setActivities] = useState<EvangelismActivity[]>([]);
-  const [activityStats, setActivityStats] = useState<EvangelismActivityStats | null>(null);
-  const [souls, setSouls] = useState<SoulWinning[]>([]);
-  const [soulStats, setSoulStats] = useState<SoulWinningStats | null>(null);
-  const [reports, setReports] = useState<EvangelismReport[]>([]);
-  const [loadingEvangelism, setLoadingEvangelism] = useState(false);
-  const [evangelismError, setEvangelismError] = useState<string | null>(null);
-
   // Exam Submissions
   const [examSubmissions, setExamSubmissions] = useState<ExamSubmission[]>([]);
   const [examStats, setExamStats] = useState<ExamStats | null>(null);
@@ -268,60 +229,47 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
   // ============================================
   // USER FUNCTIONS - FIXED
   // ============================================
-// src/context/AdminContext.tsx - Fixed refreshUsers function
 
-const refreshUsers = useCallback(async () => {
-  setLoadingUsers(true);
-  setLoadingUsersError(null);
-  try {
-    console.log('🔄 [AdminContext] Fetching users from API...');
-    const response = await crudAPI.listUsers();
-    console.log('📦 [AdminContext] Users API Response:', response);
-    
-    // Handle different response formats
-    let usersData: UserCRUD[] = [];
-    
-    // Check if response exists
-    if (response) {
-      // Case 1: response.data is an array directly
-      if (Array.isArray(response.data)) {
-        usersData = response.data;
-      } 
-      // Case 2: response.data has a results property (paginated response)
-      else if (response.data && typeof response.data === 'object' && 'results' in response.data && Array.isArray(response.data.results)) {
-        usersData = response.data.results;
-      } 
-      // Case 3: response.data has a data property that is an array
-      else if (response.data && typeof response.data === 'object' && 'data' in response.data && Array.isArray(response.data.data)) {
-        usersData = response.data.data;
+  const refreshUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    setLoadingUsersError(null);
+    try {
+      console.log('🔄 [AdminContext] Fetching users from API...');
+      const response = await crudAPI.listUsers();
+      console.log('📦 [AdminContext] Users API Response:', response);
+      
+      // Handle different response formats
+      let usersData: UserCRUD[] = [];
+      
+      if (response) {
+        if (Array.isArray(response.data)) {
+          usersData = response.data;
+        } else if (response.data && typeof response.data === 'object' && 'results' in response.data && Array.isArray(response.data.results)) {
+          usersData = response.data.results;
+        } else if (response.data && typeof response.data === 'object' && 'data' in response.data && Array.isArray(response.data.data)) {
+          usersData = response.data.data;
+        } else if (Array.isArray(response)) {
+          usersData = response;
+        } else if (response && typeof response === 'object' && 'results' in response && Array.isArray(response.results)) {
+          usersData = response.results;
+        }
       }
-      // Case 4: response itself is an array (if axios returns array directly)
-      else if (Array.isArray(response)) {
-        usersData = response;
+      
+      console.log(`[AdminContext] Processed ${usersData.length} users`);
+      setUsers(usersData);
+      
+      if (usersData.length === 0) {
+        console.warn('[AdminContext] No users found in the system');
       }
-      // Case 5: response has results property (if response is not wrapped in data)
-      else if (response && typeof response === 'object' && 'results' in response && Array.isArray(response.results)) {
-        usersData = response.results;
-      }
+    } catch (err: any) {
+      console.error('❌ [AdminContext] Error fetching users:', err);
+      const message = err.response?.data?.error || err.message || 'Failed to load users';
+      setLoadingUsersError(message);
+      toast.error(message);
+    } finally {
+      setLoadingUsers(false);
     }
-    
-    console.log(`[AdminContext] Processed ${usersData.length} users`);
-    console.log(' [AdminContext] Users data:', usersData);
-    
-    setUsers(usersData);
-    
-    if (usersData.length === 0) {
-      console.warn('[AdminContext] No users found in the system');
-    }
-  } catch (err: any) {
-    console.error(' [AdminContext] Error fetching users:', err);
-    const message = err.response?.data?.error || err.message || 'Failed to load users';
-    setLoadingUsersError(message);
-    toast.error(message);
-  } finally {
-    setLoadingUsers(false);
-  }
-}, []);
+  }, []);
 
   const deleteUser = useCallback(async (id: number) => {
     try {
@@ -472,10 +420,10 @@ const refreshUsers = useCallback(async () => {
 
   const getStudentStatusBadge = useCallback((student: Student) => {
     const statusMap: Record<string, { label: string; className: string; icon: React.ReactElement; }> = {
-      active: { label: 'Active', className: 'bg-green-100 text-green-700', icon: <span className="mr-1">+</span> },
-      pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-700', icon: <span className="mr-1">!</span> },
-      graduated: { label: 'Graduated', className: 'bg-blue-100 text-blue-700', icon: <span className="mr-1">*</span> },
-      completed: { label: 'Completed', className: 'bg-purple-100 text-purple-700', icon: <span className="mr-1">#</span> },
+      active: { label: 'Active', className: 'bg-green-100 text-green-700', icon: <span className="mr-1">●</span> },
+      pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-700', icon: <span className="mr-1">●</span> },
+      graduated: { label: 'Graduated', className: 'bg-blue-100 text-blue-700', icon: <span className="mr-1">●</span> },
+      completed: { label: 'Completed', className: 'bg-purple-100 text-purple-700', icon: <span className="mr-1">●</span> },
     };
     return statusMap[student.status] || statusMap.pending;
   }, []);
@@ -727,9 +675,9 @@ const refreshUsers = useCallback(async () => {
 
   const getSermonStatusBadge = useCallback((sermon: Sermon) => {
     const statusMap: Record<string, { label: string; className: string; icon: React.ReactElement; }> = {
-      published: { label: 'Published', className: 'bg-green-100 text-green-700', icon: <span className="mr-1">+</span> },
-      draft: { label: 'Draft', className: 'bg-yellow-100 text-yellow-700', icon: <span className="mr-1">!</span> },
-      archived: { label: 'Archived', className: 'bg-gray-100 text-gray-700', icon: <span className="mr-1">-</span> },
+      published: { label: 'Published', className: 'bg-green-100 text-green-700', icon: <span className="mr-1">●</span> },
+      draft: { label: 'Draft', className: 'bg-yellow-100 text-yellow-700', icon: <span className="mr-1">●</span> },
+      archived: { label: 'Archived', className: 'bg-gray-100 text-gray-700', icon: <span className="mr-1">●</span> },
     };
     return statusMap[sermon.status] || statusMap.draft;
   }, []);
@@ -792,103 +740,6 @@ const refreshUsers = useCallback(async () => {
       toast.error(message);
       throw err;
     }
-  }, []);
-
-  // ============================================
-  // EVANGELISM FUNCTIONS
-  // ============================================
-  const refreshActivities = useCallback(async () => {
-    try {
-      const response = await evangelismAPI.activities.list();
-      setActivities(response.data);
-    } catch (err: any) {
-      console.error('Error fetching activities:', err);
-    }
-  }, []);
-
-  const refreshSouls = useCallback(async () => {
-    try {
-      const response = await evangelismAPI.souls.list();
-      setSouls(response.data);
-    } catch (err: any) {
-      console.error('Error fetching souls:', err);
-    }
-  }, []);
-
-  const refreshReports = useCallback(async () => {
-    try {
-      const response = await evangelismAPI.reports.list();
-      setReports(response.data);
-    } catch (err: any) {
-      console.error('Error fetching reports:', err);
-    }
-  }, []);
-
-  const refreshAllEvangelism = useCallback(async () => {
-    setLoadingEvangelism(true);
-    setEvangelismError(null);
-    try {
-      const [activitiesRes, soulsRes, reportsRes, activityStatsRes, soulStatsRes] = await Promise.all([
-        evangelismAPI.activities.list(),
-        evangelismAPI.souls.list(),
-        evangelismAPI.reports.list(),
-        evangelismAPI.activities.stats(),
-        evangelismAPI.souls.stats(),
-      ]);
-      setActivities(activitiesRes.data);
-      setSouls(soulsRes.data);
-      setReports(reportsRes.data);
-      setActivityStats(activityStatsRes.data);
-      setSoulStats(soulStatsRes.data);
-    } catch (err: any) {
-      const message = err.response?.data?.error || 'Failed to load evangelism data';
-      setEvangelismError(message);
-      toast.error(message);
-    } finally {
-      setLoadingEvangelism(false);
-    }
-  }, []);
-
-  const addActivity = (activity: EvangelismActivity) => {
-    setActivities(prev => [activity, ...prev]);
-  };
-
-  const updateActivity = (id: number, updatedActivity: EvangelismActivity) => {
-    setActivities(prev => prev.map(a => a.id === id ? updatedActivity : a));
-  };
-
-  const deleteActivity = useCallback(async (id: number) => {
-    await evangelismAPI.activities.delete(id);
-    setActivities(prev => prev.filter(a => a.id !== id));
-    toast.success('Activity deleted successfully');
-  }, []);
-
-  const addSoul = (soul: SoulWinning) => {
-    setSouls(prev => [soul, ...prev]);
-  };
-
-  const updateSoul = (id: number, updatedSoul: SoulWinning) => {
-    setSouls(prev => prev.map(s => s.id === id ? updatedSoul : s));
-  };
-
-  const deleteSoul = useCallback(async (id: number) => {
-    await evangelismAPI.souls.delete(id);
-    setSouls(prev => prev.filter(s => s.id !== id));
-    toast.success('Soul record deleted successfully');
-  }, []);
-
-  const addReport = (report: EvangelismReport) => {
-    setReports(prev => [report, ...prev]);
-  };
-
-  const updateReport = (id: number, updatedReport: EvangelismReport) => {
-    setReports(prev => prev.map(r => r.id === id ? updatedReport : r));
-  };
-
-  const deleteReport = useCallback(async (id: number) => {
-    await evangelismAPI.reports.delete(id);
-    setReports(prev => prev.filter(r => r.id !== id));
-    toast.success('Report deleted successfully');
   }, []);
 
   // ============================================
@@ -1006,7 +857,6 @@ const refreshUsers = useCallback(async () => {
           refreshAllEvangelists(),
           refreshAllGroups(),
           refreshAllSermons(),
-          refreshAllEvangelism(),
           refreshUsers(),
           refreshExamSubmissions()
         ]);
@@ -1056,15 +906,6 @@ const refreshUsers = useCallback(async () => {
     commentStats,
     loadingComments,
     commentError,
-    
-    // Evangelism
-    activities,
-    activityStats,
-    souls,
-    soulStats,
-    reports,
-    loadingEvangelism,
-    evangelismError,
     
     // Exam Submissions
     examSubmissions,
@@ -1126,21 +967,6 @@ const refreshUsers = useCallback(async () => {
     addComment,
     deleteComment,
     likeComment,
-    
-    // Evangelism Functions
-    refreshActivities,
-    refreshSouls,
-    refreshReports,
-    refreshAllEvangelism,
-    addActivity,
-    updateActivity,
-    deleteActivity,
-    addSoul,
-    updateSoul,
-    deleteSoul,
-    addReport,
-    updateReport,
-    deleteReport,
     
     // Exam Functions
     refreshExamSubmissions,

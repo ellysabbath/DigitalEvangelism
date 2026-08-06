@@ -321,22 +321,7 @@ export const commentsAPI = {
 // EVANGELISM API
 // ============================================
 export const evangelismAPI = {
-  activities: {
-    list: (params?: any) => api.get('/evangelism/activities/', { params }),
-    create: (data: any) => api.post('/evangelism/activities/create/', data),
-    get: (id: number) => api.get(`/evangelism/activities/${id}/`),
-    update: (id: number, data: any) => api.patch(`/evangelism/activities/${id}/update/`, data),
-    delete: (id: number) => api.delete(`/evangelism/activities/${id}/delete/`),
-    stats: () => api.get('/evangelism/activities/stats/'),
-  },
-  souls: {
-    list: (params?: any) => api.get('/evangelism/souls/', { params }),
-    create: (data: any) => api.post('/evangelism/souls/create/', data),
-    get: (id: number) => api.get(`/evangelism/souls/${id}/`),
-    update: (id: number, data: any) => api.patch(`/evangelism/souls/${id}/update/`, data),
-    delete: (id: number) => api.delete(`/evangelism/souls/${id}/delete/`),
-    stats: () => api.get('/evangelism/souls/stats/'),
-  },
+  
   reports: {
     list: (params?: any) => api.get('/evangelism/reports/', { params }),
     create: (data: any) => api.post('/evangelism/reports/create/', data),
