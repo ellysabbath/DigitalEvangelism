@@ -73,6 +73,7 @@ const getNavigationItems = (role: string) => {
     evangelist: [
       ...commonItems,
       { to: '/ev/dashboard', label: 'My Dashboard', icon: <FaChartBar />, description: 'Evangelist overview' },
+      { to: '/admin/users', label: 'User Management', icon: <FaUsers />, description: 'Manage system users' },
       { to: '/ev/dashboard', label: 'My Students', icon: <FaGraduationCap />, description: 'Your students' },
       { to: '/admin/groups', label: 'My Groups', icon: <FaUsers />, description: 'Your groups' },
       { to: '/admin/students', label: 'Students', icon: <FaGraduationCap />, description: 'Manage students' },
