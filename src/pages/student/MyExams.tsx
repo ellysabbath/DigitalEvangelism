@@ -559,12 +559,12 @@ const MyExams: React.FC = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               {/* Modal Header */}
-              <div className="sticky top-0 bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
+              <div className="sticky top-0 bg-gradient-to-r from-white-600 to-white-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
                 <div className="flex items-center space-x-3">
                   <FaBook className="text-white text-xl" />
                   <div>
-                    <h3 className="text-white font-bold text-lg">{selectedExam.sermon_title}</h3>
-                    <p className="text-cyan-100 text-sm">Exam Results</p>
+                    <h3 className="text-dark font-bold text-lg">{selectedExam.sermon_title}</h3>
+                    <p className="text-dark-100 text-sm">Exam Results</p>
                   </div>
                 </div>
                 <button

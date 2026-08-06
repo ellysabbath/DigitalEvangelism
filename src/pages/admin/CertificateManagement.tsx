@@ -344,14 +344,14 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-gradient-to-r from-white-600 to-white-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
           <div className="flex items-center space-x-3">
-            <FaCertificate className="text-white text-xl" />
+            <FaCertificate className="text-dark text-xl" />
             <div>
-              <h3 className="text-white font-bold text-lg">
+              <h3 className="text-dark font-bold text-lg">
                 {mode === 'create' ? 'Create New Certificate' : 'Edit Certificate'}
               </h3>
-              <p className="text-cyan-100 text-sm">
+              <p className="text-dark-100 text-sm">
                 {mode === 'edit' && certificate ? `Certificate #${certificate.certificate_number}` : 'Fill in the details below'}
               </p>
             </div>
@@ -501,7 +501,7 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
           </div>
 
           {/* Image Uploads */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2">
             {/* Logo Image */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Logo Image</label>
@@ -546,49 +546,8 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
               </div>
             </div>
 
-            {/* Signature Person */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Signature Person</label>
-              <div className="mt-1 flex flex-col items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-cyan-500 transition-colors">
-                {previews.signature ? (
-                  <img src={previews.signature} alt="Signature" className="w-full h-24 object-contain" />
-                ) : (
-                  <FaFileAlt className="text-3xl text-gray-400" />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileChange('signature_person', e.target.files?.[0] || null)}
-                  className="hidden"
-                  id="signature-upload"
-                />
-                <label htmlFor="signature-upload" className="mt-2 text-sm text-cyan-600 hover:text-cyan-700 cursor-pointer">
-                  {previews.signature ? 'Change' : 'Upload'}
-                </label>
-              </div>
-            </div>
-
-            {/* Leader Signature */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Leader Signature</label>
-              <div className="mt-1 flex flex-col items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-cyan-500 transition-colors">
-                {previews.leader ? (
-                  <img src={previews.leader} alt="Leader" className="w-full h-24 object-contain" />
-                ) : (
-                  <FaFileAlt className="text-3xl text-gray-400" />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileChange('leader_signature', e.target.files?.[0] || null)}
-                  className="hidden"
-                  id="leader-upload"
-                />
-                <label htmlFor="leader-upload" className="mt-2 text-sm text-cyan-600 hover:text-cyan-700 cursor-pointer">
-                  {previews.leader ? 'Change' : 'Upload'}
-                </label>
-              </div>
-            </div>
+           
+         
           </div>
 
           {/* Actions */}
@@ -849,7 +808,7 @@ const CertificateManagement: React.FC = () => {
   // API BASE URL
   // ============================================================
 
-  const API_BASE_URL = 'http://127.0.0.1:8000/api/certificates/certificates';
+  const API_BASE_URL = 'https://hopeprojects.pythonanywhere.com/api/certificates/certificates';
 
   // ============================================================
   // API CALLS - DIRECT

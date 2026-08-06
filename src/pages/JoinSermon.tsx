@@ -192,9 +192,9 @@ const JoinSermon: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-white-50 to-grey-50 flex items-center justify-center">
         <div className="text-center">
-          <FaSpinner className="animate-spin text-5xl text-cyan-600 mx-auto mb-4" />
+          <FaSpinner className="animate-spin text-5xl text-grey-600 mx-auto mb-4" />
           <p className="text-gray-600">Loading sermon...</p>
         </div>
       </div>
@@ -208,7 +208,7 @@ const JoinSermon: React.FC = () => {
           <FaTimesCircle className="text-6xl text-red-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Sermon Not Found</h2>
           <p className="text-gray-600 mb-6">{error || 'The sermon you\'re looking for doesn\'t exist or has been removed.'}</p>
-          <Link to="/" className="px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors inline-block">
+          <Link to="/" className="px-6 py-3 bg-grey-600 hover:bg-cyan-700 text-white rounded-lg transition-colors inline-block">
             Go Home
           </Link>
         </div>
@@ -237,15 +237,15 @@ const JoinSermon: React.FC = () => {
         {/* Main Card */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-8 text-white">
+          <div className="bg-gradient-to-r from-white-600 to-white-600 px-6 py-8 text-dark">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="p-3 bg-white/20 rounded-full">
                   <FaBook className="text-3xl" />
                 </div>
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-bold">{sermon.title}</h1>
-                  <p className="text-cyan-100 text-sm">Topic: {sermon.topic}</p>
+                  <h1 className="text-2xl md:text-3xl font-bold text-dark-700">{sermon.title}</h1>
+                  <p className="text-dark-100 text-sm">Topic: {sermon.topic}</p>
                 </div>
               </div>
               <span className={`px-3 py-1 rounded-full text-sm ${statusBadge.className}`}>

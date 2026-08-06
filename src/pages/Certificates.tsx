@@ -64,7 +64,7 @@ const Certificates: React.FC = () => {
   // API BASE URL
   // ============================================================
 
-  const API_BASE_URL = 'http://127.0.0.1:8000/api/certificates/certificates';
+  const API_BASE_URL = 'https://hopeprojects.pythonanywhere.com/api/certificates/certificates';
 
   // ============================================================
   // GET AUTH HEADERS

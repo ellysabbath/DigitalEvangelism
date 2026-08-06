@@ -532,7 +532,7 @@ const ExamManagement: React.FC = () => {
                       {submission.status === 'pending' && (
                         <button
                           onClick={() => handleGradeExam(submission)}
-                          className="p-2 text-gray-500 hover:text-cyan-600 transition-colors rounded-lg hover:bg-cyan-50"
+                          className="p-2 text-gray-500 hover:text-dark-600 transition-colors rounded-lg hover:bg-grey-50"
                           title="Grade Exam"
                         >
                           <FaEdit />
@@ -652,12 +652,12 @@ const ExamManagement: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
+            <div className="sticky top-0 bg-gradient-to-r from-white-600 to-grey-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
               <div className="flex items-center space-x-3">
                 <FaEdit className="text-white text-xl" />
                 <div>
-                  <h3 className="text-white font-bold text-lg">Grade Exam</h3>
-                  <p className="text-cyan-100 text-sm">
+                  <h3 className="text-dark font-bold text-lg">Grade Exam</h3>
+                  <p className="text-dark-100 text-sm">
                     {selectedSubmission.student_name} - {selectedSubmission.sermon_title}
                   </p>
                 </div>
@@ -868,12 +868,12 @@ const ExamManagement: React.FC = () => {
       {showDetailsModal && selectedSubmission && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
+            <div className="sticky top-0 bg-gradient-to-r from-white-600 to-grey-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
               <div className="flex items-center space-x-3">
                 <FaEye className="text-white text-xl" />
                 <div>
-                  <h3 className="text-white font-bold text-lg">Exam Details</h3>
-                  <p className="text-blue-100 text-sm">
+                  <h3 className="text-Dark font-bold text-lg">Exam Details</h3>
+                  <p className="text-dark-100 text-sm">
                     {selectedSubmission.student_name} - {selectedSubmission.sermon_title}
                   </p>
                 </div>
@@ -1041,12 +1041,12 @@ const ExamManagement: React.FC = () => {
       {showAnalytics && analytics && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
+            <div className="sticky top-0 bg-gradient-to-r from-white-600 to-grey-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
               <div className="flex items-center space-x-3">
                 <FaChartBar className="text-white text-xl" />
                 <div>
-                  <h3 className="text-white font-bold text-lg">Exam Analytics</h3>
-                  <p className="text-purple-100 text-sm">Performance overview</p>
+                  <h3 className="text-dark font-bold text-lg">Exam Analytics</h3>
+                  <p className="text-dark-100 text-sm">Performance overview</p>
                 </div>
               </div>
               <button

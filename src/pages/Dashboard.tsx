@@ -73,8 +73,10 @@ const getNavigationItems = (role: string) => {
     evangelist: [
       ...commonItems,
       { to: '/ev/dashboard', label: 'My Dashboard', icon: <FaChartBar />, description: 'Evangelist overview' },
-      { to: '/admin/students', label: 'My Students', icon: <FaGraduationCap />, description: 'Your students' },
+      { to: '/ev/dashboard', label: 'My Students', icon: <FaGraduationCap />, description: 'Your students' },
       { to: '/admin/groups', label: 'My Groups', icon: <FaUsers />, description: 'Your groups' },
+      { to: '/admin/students', label: 'Students', icon: <FaGraduationCap />, description: 'Manage students' },
+      { to: '/admin/issue-certificate', label: 'Issue Certificate', icon: <FaCertificate />, description: 'Issue new certificates' },
       { to: '/admin/sermons', label: 'My Sermons', icon: <FaBook />, description: 'Your sermons' },
       { to: '/evangelist/exams', label: 'Exam Management', icon: <FaClipboardList />, description: 'Grade exams' },
     ],
@@ -466,7 +468,7 @@ const Dashboard: React.FC = () => {
                 <h1 className="text-3xl font-serif font-bold">
                   Welcome back, {user?.full_name || 'Believer'}! 
                 </h1>
-                <p className="mt-2 text-cyan-100">
+                <p className="mt-2 text-dark-100">
                   {userRole === 'admin' && 'Manage the evangelism network effectively'}
                   {userRole === 'evangelist' && 'Continue spreading the Gospel through your group'}
                   {userRole === 'student' && 'Grow in faith through learning and exams'}
