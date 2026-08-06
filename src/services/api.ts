@@ -322,14 +322,7 @@ export const commentsAPI = {
 // ============================================
 export const evangelismAPI = {
   
-  reports: {
-    list: (params?: any) => api.get('/evangelism/reports/', { params }),
-    create: (data: any) => api.post('/evangelism/reports/create/', data),
-    get: (id: number) => api.get(`/evangelism/reports/${id}/`),
-    update: (id: number, data: any) => api.patch(`/evangelism/reports/${id}/update/`, data),
-    delete: (id: number) => api.delete(`/evangelism/reports/${id}/delete/`),
-    stats: (params?: any) => api.get('/evangelism/reports/stats/', { params }),
-  },
+
   dashboard: () => api.get('/evangelism/dashboard/'),
 };
 
