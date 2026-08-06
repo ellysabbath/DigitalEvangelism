@@ -359,17 +359,17 @@ const Register: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6 text-center">
+          <div className="bg-gradient-to-r from-white-600 to-whitw-600 px-8 py-6 text-center">
             <div className="flex justify-center mb-3">
               <div className="bg-white/20 backdrop-blur-sm p-3 rounded-2xl">
                 <FaUserPlus className="text-3xl text-white" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-white">Join Digital Evangelism</h1>
-            <p className="text-blue-100 text-sm">No password needed - Just your phone number!</p>
+            <h1 className="text-2xl font-bold text-dark">Join Digital Evangelism</h1>
+            <p className="text-dark-100 text-sm">No password needed - Just your phone number!</p>
             <div className="mt-2 inline-flex items-center px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full">
               <FaGraduationCap className="text-white mr-2 text-xs" />
-              <span className="text-white text-xs">Default Role: Student</span>
+              <span className="text-dark text-xs">Default Role: Student</span>
             </div>
           </div>
 
