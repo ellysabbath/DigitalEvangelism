@@ -5,7 +5,7 @@ import {
   FaBook, FaCheckCircle, FaClock, 
   FaExclamationCircle, FaEye, FaSearch,
   FaStar, FaStarHalf, FaRegStar, FaCalendarAlt,
-  FaArrowLeft, FaSpinner, FaTimes, FaFileAlt,
+  FaArrowLeft, FaSpinner, FaTimes,
   FaQuestionCircle, FaShare
 } from 'react-icons/fa';
 import { useAuth } from '../../auth/context/AuthContext';
@@ -171,23 +171,22 @@ const MyExams: React.FC = () => {
   };
 
   // ========== FIXED: PASS/FAIL LOGIC ==========
-  // Passing threshold is now 30% (or whatever is set in backend)
-  // The backend already calculates is_passed based on 70% threshold
-  // But we want to show Pass for scores >= 30
-  
   const isExamPassed = (exam: ExamAttempt): boolean => {
-    // If exam is not graded yet, return false
     if (exam.status === 'pending') return false;
-    
-    // If backend already marked as passed, use that
     if (exam.is_passed) return true;
-    
-    // For scores >= 30, consider it passed
-    // This overrides the backend's 70% threshold
     const percentage = exam.percentage || 0;
     if (percentage >= 30) return true;
-    
     return false;
+  };
+
+  // ========== FIXED: getStatusLabel ==========
+  const getStatusLabel = (exam: ExamAttempt): string => {
+    if (exam.status === 'pending') return 'Pending';
+    if (exam.status === 'reviewed') return 'Reviewed';
+    if (exam.status === 'graded') {
+      return isExamPassed(exam) ? 'Passed' : 'Failed';
+    }
+    return 'Unknown';
   };
 
   const getStatusBadge = (exam: ExamAttempt) => {
@@ -199,7 +198,6 @@ const MyExams: React.FC = () => {
       return 'bg-blue-100 text-blue-700';
     }
     
-    // For graded exams, use our custom pass/fail logic
     if (exam.status === 'graded') {
       return isExamPassed(exam) 
         ? 'bg-green-100 text-green-700' 
@@ -225,15 +223,6 @@ const MyExams: React.FC = () => {
     }
     
     return <FaQuestionCircle className="text-gray-500" />;
-  };
-
-  const getStatusLabel = (exam: ExamAttempt) => {
-    if (exam.status === 'pending') return 'Pending';
-    if (exam.status === 'reviewed') return 'Reviewed';
-    if (exam.status === 'graded') {
-      return isExamPassed(exam) ? 'Passed' : 'Failed';
-    }
-    return exam.status.charAt(0).toUpperCase() + exam.status.slice(1);
   };
 
   const getGradeColor = (percentage: number) => {
@@ -448,7 +437,6 @@ const MyExams: React.FC = () => {
               const totalScore = calculateTotalScore(exam);
               const percentage = maxPossible > 0 ? (totalScore / maxPossible) * 100 : 0;
               const passed = isExamPassed(exam);
-              const displayStatus = passed ? 'passed' : (exam.status === 'pending' ? 'pending' : 'failed');
               
               return (
                 <div key={exam.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all overflow-hidden group">
@@ -525,7 +513,6 @@ const MyExams: React.FC = () => {
                         <FaEye className="mr-1" />
                         View
                       </button>
-                      {/* Show Retake only if failed (score < 30%) */}
                       {exam.status === 'graded' && !passed && (
                         <button
                           onClick={() => handleRetakeExam(exam.sermon)}
@@ -619,7 +606,7 @@ const MyExams: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Pass/Fail Indicator - FIXED: Shows Pass for 30%+ */}
+                {/* Pass/Fail Indicator */}
                 {selectedExam.status === 'graded' && (
                   <div className={`p-4 rounded-lg border ${
                     isExamPassed(selectedExam)
@@ -636,7 +623,7 @@ const MyExams: React.FC = () => {
                         <h4 className={`text-lg font-bold ${
                           isExamPassed(selectedExam) ? 'text-green-700' : 'text-red-700'
                         }`}>
-                          {isExamPassed(selectedExam) ? '✅ Passed' : '❌ Failed'}
+                          {isExamPassed(selectedExam) ? 'Passed' : 'Failed'}
                         </h4>
                         <p className={`text-sm ${
                           isExamPassed(selectedExam) ? 'text-green-600' : 'text-red-600'

@@ -3,10 +3,9 @@ import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   FaArrowLeft, FaUsers, FaUserPlus, FaEnvelope,
-  FaLemon, FaChartLine, FaGraduationCap, FaAward,
-  FaSearch, FaEye, FaEdit, FaTrash, FaDownload,
+  FaChartLine, FaSearch, FaEye, FaEdit, FaTrash,
   FaShare, FaQrcode, FaClock, FaCheckCircle,
-  FaExclamationCircle, FaUserGraduate
+  FaExclamationCircle
 } from 'react-icons/fa';
 import { useAuth } from '../auth/context/AuthContext';
 
@@ -24,7 +23,7 @@ interface Member {
 const GroupDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, userRole } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'sermons' | 'exams'>('overview');
   const [showAddMember, setShowAddMember] = useState(false);
 
@@ -64,6 +63,9 @@ const GroupDetail: React.FC = () => {
         return <FaClock className="text-yellow-500" />;
     }
   };
+
+  // Get user role from user object
+  const userRole = user?.role || '';
 
   const canManageGroup = userRole === 'admin' || userRole === 'evangelist';
 
@@ -126,7 +128,7 @@ const GroupDetail: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-blue-500">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Members</p>
@@ -137,18 +139,18 @@ const GroupDetail: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Sermons</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{group.totalSermons}</p>
             </div>
             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
-              <FaLemon className="text-purple-600 text-xl" />
+              <FaChartLine className="text-purple-600 text-xl" />
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-green-500">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Avg Progress</p>
@@ -184,13 +186,13 @@ const GroupDetail: React.FC = () => {
       {activeTab === 'overview' && (
         <div className="space-y-6">
           {/* Recent Activity */}
-          <div className="card">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Activity</h3>
             <div className="space-y-3">
               {[1, 2, 3, 4].map((item) => (
                 <div key={item} className="flex items-center space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
                   <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">
-                    <FaLemon className="text-gray-600 dark:text-gray-400" />
+                    <FaChartLine className="text-gray-600 dark:text-gray-400" />
                   </div>
                   <div className="flex-1">
                     <p className="text-sm text-gray-900 dark:text-white">New sermon shared: "The Gospel of Grace"</p>
@@ -213,13 +215,13 @@ const GroupDetail: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search members..."
-                className="input-field pl-10"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               />
             </div>
             {canManageGroup && (
               <button
                 onClick={() => setShowAddMember(!showAddMember)}
-                className="btn-primary flex items-center space-x-2"
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
               >
                 <FaUserPlus />
                 <span>Add Member</span>
@@ -228,15 +230,15 @@ const GroupDetail: React.FC = () => {
           </div>
 
           {showAddMember && (
-            <div className="card border-2 border-primary-200 dark:border-primary-800">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-2 border-primary-200 dark:border-primary-800">
               <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Add Member to Group</h4>
               <div className="flex space-x-2">
                 <input
                   type="text"
                   placeholder="Enter email address..."
-                  className="input-field flex-1"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 />
-                <button className="btn-primary">Add</button>
+                <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all">Add</button>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 Type the email of the person you want to add to this group
@@ -244,70 +246,72 @@ const GroupDetail: React.FC = () => {
             </div>
           )}
 
-          <div className="card overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Member</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Role</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Progress</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Exams</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((member) => (
-                  <tr key={member.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 font-semibold">
-                          {member.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">{member.name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{member.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{member.role}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div
-                            className="bg-primary-600 rounded-full h-2 transition-all"
-                            style={{ width: `${member.progress}%` }}
-                          />
-                        </div>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">{member.progress}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{member.examsCompleted}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-1">
-                        {getStatusIcon(member.status)}
-                        <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">{member.status}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex space-x-2">
-                        <button className="text-gray-400 hover:text-primary-600 transition-colors">
-                          <FaEye />
-                        </button>
-                        <button className="text-gray-400 hover:text-blue-600 transition-colors">
-                          <FaEnvelope />
-                        </button>
-                        {canManageGroup && (
-                          <button className="text-gray-400 hover:text-red-600 transition-colors">
-                            <FaTrash />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Member</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Role</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Progress</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Exams</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {members.map((member) => (
+                    <tr key={member.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 font-semibold">
+                            {member.name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">{member.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{member.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{member.role}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div
+                              className="bg-primary-600 rounded-full h-2 transition-all"
+                              style={{ width: `${member.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">{member.progress}%</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{member.examsCompleted}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center space-x-1">
+                          {getStatusIcon(member.status)}
+                          <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">{member.status}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex space-x-2">
+                          <button className="text-gray-400 hover:text-primary-600 transition-colors">
+                            <FaEye />
+                          </button>
+                          <button className="text-gray-400 hover:text-blue-600 transition-colors">
+                            <FaEnvelope />
+                          </button>
+                          {canManageGroup && (
+                            <button className="text-gray-400 hover:text-red-600 transition-colors">
+                              <FaTrash />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -322,15 +326,15 @@ const GroupDetail: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search sermons..."
-                className="input-field pl-10"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               />
             </div>
             {canManageGroup && (
               <Link
                 to={`/sermons/create`}
-                className="btn-primary flex items-center space-x-2"
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
               >
-                <FaLemon />
+                <FaChartLine />
                 <span>Share Sermon</span>
               </Link>
             )}
@@ -338,7 +342,7 @@ const GroupDetail: React.FC = () => {
 
           <div className="space-y-4">
             {sermons.map((sermon) => (
-              <div key={sermon.id} className="card hover:shadow-card-hover transition-shadow">
+              <div key={sermon.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-shadow p-6">
                 <div className="flex items-start justify-between">
                   <div>
                     <Link to={`/sermons/${sermon.id}`}>
@@ -386,17 +390,17 @@ const GroupDetail: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search exams..."
-                className="input-field pl-10"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               />
             </div>
-            <select className="input-field max-w-xs">
+            <select className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white max-w-xs">
               <option value="all">All Exams</option>
               <option value="completed">Completed</option>
               <option value="pending">Pending</option>
             </select>
           </div>
 
-          <div className="card">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>

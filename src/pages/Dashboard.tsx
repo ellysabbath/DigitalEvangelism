@@ -4,17 +4,17 @@ import { useAuth } from '../auth/context/AuthContext';
 import { useAdmin } from '../auth/context/AdminContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  FaUser, FaUsers, FaBook, FaGraduationCap, 
-  FaClock, FaPlus, FaQrcode, FaArrowRight,
-  FaBell, FaChartLine, FaUserCircle, FaSignOutAlt,
-  FaCog, FaFileAlt, FaCertificate, FaBible,
-  FaEye, FaHeart, FaShare, FaSpinner,
-  FaChevronDown, FaChevronUp, FaHome,
-  FaUserGraduate, FaChalkboardTeacher, FaBookOpen,
-  FaCheckCircle, FaExclamationTriangle, FaCalendarAlt,
-  FaFire, FaTag, FaUserTie
+  FaUser, FaBook, 
+  FaClock, FaArrowRight,
+  FaBell, 
+  FaCog, FaCertificate, FaBible,
+  FaEye, 
+  FaUserGraduate, 
+  FaCalendarAlt,
 } from 'react-icons/fa';
-import toast from 'react-hot-toast';
+import { 
+  FaSignOutAlt 
+} from 'react-icons/fa';
 
 // ============================================
 // TYPES
@@ -52,7 +52,6 @@ const Dashboard: React.FC = () => {
   } = useAdmin();
   
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -208,11 +207,11 @@ const Dashboard: React.FC = () => {
       .slice(0, 2);
   };
 
-  const getProfilePicture = () => {
+  const getProfilePicture = (): string | undefined => {
     if (user?.profile?.profile_picture) {
       return user.profile.profile_picture;
     }
-    return null;
+    return undefined;
   };
 
   const formatDate = (dateString: string) => {

@@ -1,7 +1,7 @@
 // src/pages/admin/ViewStudent.tsx
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FaArrowLeft, FaUserGraduate, FaEnvelope, FaPhone, FaAward, FaChartBar, FaClock, FaCheckCircle, FaUsers, FaEdit, FaPrint, FaDownload } from 'react-icons/fa';
+import { FaArrowLeft, FaUserGraduate, FaEnvelope, FaPhone, FaChartBar, FaClock, FaCheckCircle, FaUsers, FaEdit, FaPrint, FaDownload } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
 const ViewStudent: React.FC = () => {

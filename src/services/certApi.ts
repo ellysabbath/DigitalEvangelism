@@ -1,5 +1,5 @@
 // src/services/certApi.ts
-import api from './api';
+import apiClient from './api';  // Import the default export
 import type {
   Certificate,
   CertificateCreateData,
@@ -12,6 +12,7 @@ import type {
 
 const BASE_URL = '/certificates/certificates';
 
+// Use apiClient.api to access the axios instance
 export const certApi = {
   // ============================================
   // CRUD Operations
@@ -21,19 +22,19 @@ export const certApi = {
    * Get all certificates with optional filters
    */
   listCertificates: (params?: CertificateFilterParams) => 
-    api.get<Certificate[]>(BASE_URL, { params }),
+    apiClient.api.get<Certificate[]>(BASE_URL, { params }),
 
   /**
    * Get a single certificate by ID
    */
   getCertificate: (id: string) => 
-    api.get<Certificate>(`${BASE_URL}/${id}/`),
+    apiClient.api.get<Certificate>(`${BASE_URL}/${id}/`),
 
   /**
    * Create a new certificate
    */
   createCertificate: (data: CertificateCreateData | FormData) => 
-    api.post<Certificate>(BASE_URL, data, {
+    apiClient.api.post<Certificate>(BASE_URL, data, {
       headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined
     }),
 
@@ -41,7 +42,7 @@ export const certApi = {
    * Update a certificate
    */
   updateCertificate: (id: string, data: CertificateUpdateData | FormData) => 
-    api.patch<Certificate>(`${BASE_URL}/${id}/`, data, {
+    apiClient.api.patch<Certificate>(`${BASE_URL}/${id}/`, data, {
       headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined
     }),
 
@@ -49,7 +50,7 @@ export const certApi = {
    * Delete a certificate
    */
   deleteCertificate: (id: string) => 
-    api.delete(`${BASE_URL}/${id}/`),
+    apiClient.api.delete(`${BASE_URL}/${id}/`),
 
   // ============================================
   // Special Actions
@@ -59,7 +60,7 @@ export const certApi = {
    * Issue a certificate (change status to 'issued')
    */
   issueCertificate: (id: string) => 
-    api.post<{ success: boolean; message: string; certificate_number: string }>(
+    apiClient.api.post<{ success: boolean; message: string; certificate_number: string }>(
       `${BASE_URL}/${id}/issue/`
     ),
 
@@ -67,19 +68,23 @@ export const certApi = {
    * Preview PDF
    */
   previewPDF: (id: string) => 
-    api.get(`${BASE_URL}/${id}/preview_pdf/`, { responseType: 'blob' }),
+    apiClient.api.get(`${BASE_URL}/${id}/preview_pdf/`, { 
+      responseType: 'blob' 
+    }),
 
   /**
    * Download PDF
    */
   downloadPDF: (id: string) => 
-    api.get(`${BASE_URL}/${id}/download_pdf/`, { responseType: 'blob' }),
+    apiClient.api.get(`${BASE_URL}/${id}/download_pdf/`, { 
+      responseType: 'blob' 
+    }),
 
   /**
    * Regenerate PDF
    */
   regeneratePDF: (id: string) => 
-    api.post<{ success: boolean; message: string; certificate_number: string }>(
+    apiClient.api.post<{ success: boolean; message: string; certificate_number: string }>(
       `${BASE_URL}/${id}/regenerate_pdf/`
     ),
 
@@ -87,7 +92,7 @@ export const certApi = {
    * Generate certificate for a specific user
    */
   generateForUser: (data: GenerateForUserData) => 
-    api.post<{ success: boolean; message: string; certificate: Certificate }>(
+    apiClient.api.post<{ success: boolean; message: string; certificate: Certificate }>(
       `${BASE_URL}/generate_for_user/`,
       data
     ),
@@ -100,7 +105,11 @@ export const certApi = {
    * Get certificate stats
    */
   getStats: () => 
-    api.get<CertificateStats>(`${BASE_URL}/stats/`),
+    apiClient.api.get<CertificateStats>(`${BASE_URL}/stats/`),
+
+  // ============================================
+  // Utility Functions
+  // ============================================
 
   /**
    * Convert FormData for file uploads

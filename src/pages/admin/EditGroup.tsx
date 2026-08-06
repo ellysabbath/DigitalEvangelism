@@ -24,6 +24,7 @@ interface ConfirmationModalProps {
   confirmText?: string;
   cancelText?: string;
   isLoading?: boolean;
+  type?: 'danger' | 'warning' | 'info' | 'success';
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -34,17 +35,49 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  isLoading = false
+  isLoading = false,
+  type = 'warning'
 }) => {
   if (!isOpen) return null;
+
+  const getStyles = () => {
+    switch(type) {
+      case 'danger':
+        return {
+          icon: <FaExclamationTriangle className="text-red-600 text-4xl" />,
+          button: 'bg-red-600 hover:bg-red-700',
+          border: 'border-red-200'
+        };
+      case 'warning':
+        return {
+          icon: <FaExclamationTriangle className="text-yellow-600 text-4xl" />,
+          button: 'bg-yellow-600 hover:bg-yellow-700',
+          border: 'border-yellow-200'
+        };
+      case 'success':
+        return {
+          icon: <FaCheckCircle className="text-green-600 text-4xl" />,
+          button: 'bg-green-600 hover:bg-green-700',
+          border: 'border-green-200'
+        };
+      default:
+        return {
+          icon: <FaEdit className="text-blue-600 text-4xl" />,
+          button: 'bg-blue-600 hover:bg-blue-700',
+          border: 'border-blue-200'
+        };
+    }
+  };
+
+  const styles = getStyles();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
+        <div className={`p-6 border-b ${styles.border}`}>
           <div className="flex items-center space-x-4">
             <div className="flex-shrink-0">
-              <FaEdit className="text-blue-600 text-4xl" />
+              {styles.icon}
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900">{title}</h3>
@@ -63,7 +96,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
+            className={`px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center ${styles.button}`}
           >
             {isLoading ? (
               <>
@@ -86,7 +119,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 const EditGroup: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { users, refreshAllGroups, refreshUsers, loadingUsers } = useAdmin();
+  const { users, refreshAllGroups, refreshUsers, loadingUsers, removeGroupMember } = useAdmin();
   
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
@@ -94,6 +127,18 @@ const EditGroup: React.FC = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [showMemberSearch, setShowMemberSearch] = useState(false);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
+
+  // ========== CONFIRMATION MODAL STATE FOR REMOVE MEMBER ==========
+  const [removeMemberConfirm, setRemoveMemberConfirm] = useState<{
+    isOpen: boolean;
+    userId: number | null;
+    userName: string;
+  }>({
+    isOpen: false,
+    userId: null,
+    userName: '',
+  });
 
   // ========== FORM STATE ==========
   const [formData, setFormData] = useState({
@@ -207,16 +252,56 @@ const EditGroup: React.FC = () => {
     }
   };
 
-  const handleRemoveMember = (userId: number) => {
+  // ========== REMOVE MEMBER WITH CONFIRMATION ==========
+  const handleRemoveMemberClick = (userId: number) => {
     const user = users.find(u => u.id === userId);
     const userName = user?.full_name || 'User';
-    setFormData(prev => ({
-      ...prev,
-      members: prev.members.filter(id => id !== userId),
-    }));
-    toast(`${userName} removed from group`, { icon: <FaEdit className="text-blue-500" /> });
+    
+    setRemoveMemberConfirm({
+      isOpen: true,
+      userId: userId,
+      userName: userName,
+    });
   };
 
+  const handleConfirmRemoveMember = async () => {
+    if (!removeMemberConfirm.userId || !id) {
+      toast.error('Invalid member or group');
+      setRemoveMemberConfirm({ isOpen: false, userId: null, userName: '' });
+      return;
+    }
+
+    setIsRemovingMember(true);
+    try {
+      // Call the API to remove the member
+      await removeGroupMember(parseInt(id), removeMemberConfirm.userId);
+      
+      // Update local state
+      setFormData(prev => ({
+        ...prev,
+        members: prev.members.filter(mid => mid !== removeMemberConfirm.userId),
+      }));
+      
+      toast.success(`${removeMemberConfirm.userName} removed from group successfully`);
+      
+      // Refresh groups data
+      await refreshAllGroups();
+      
+    } catch (error: any) {
+      console.error('Error removing member:', error);
+      const message = error.response?.data?.error || 'Failed to remove member. Please try again.';
+      toast.error(message);
+    } finally {
+      setIsRemovingMember(false);
+      setRemoveMemberConfirm({ isOpen: false, userId: null, userName: '' });
+    }
+  };
+
+  const handleCancelRemoveMember = () => {
+    setRemoveMemberConfirm({ isOpen: false, userId: null, userName: '' });
+  };
+
+  // ========== OTHER HANDLERS ==========
   const getMemberName = (userId: number) => {
     const user = users.find(u => u.id === userId);
     return user?.full_name || user?.phone_number || `User #${userId}`;
@@ -336,7 +421,7 @@ const EditGroup: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal for Update */}
       <ConfirmationModal
         isOpen={showConfirmation}
         onClose={() => setShowConfirmation(false)}
@@ -345,6 +430,20 @@ const EditGroup: React.FC = () => {
         message={`Are you sure you want to update the group "${formData.name}"?`}
         confirmText="Update Group"
         isLoading={isLoading}
+        type="info"
+      />
+
+      {/* Confirmation Modal for Remove Member */}
+      <ConfirmationModal
+        isOpen={removeMemberConfirm.isOpen}
+        onClose={handleCancelRemoveMember}
+        onConfirm={handleConfirmRemoveMember}
+        title="Remove Member"
+        message={`Are you sure you want to remove "${removeMemberConfirm.userName}" from this group?`}
+        confirmText="Remove Member"
+        cancelText="Cancel"
+        isLoading={isRemovingMember}
+        type="danger"
       />
 
       {/* Header */}
@@ -661,8 +760,9 @@ const EditGroup: React.FC = () => {
                         )}
                         <button
                           type="button"
-                          onClick={() => handleRemoveMember(userId)}
-                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          onClick={() => handleRemoveMemberClick(userId)}
+                          disabled={isRemovingMember}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                           title="Remove member"
                         >
                           <FaTrash />

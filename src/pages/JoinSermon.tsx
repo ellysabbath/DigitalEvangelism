@@ -2,13 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
-  FaUserPlus, FaChurch, FaClock, 
-  FaUsers, FaBookOpen, FaHeart, FaShare,
+  FaUserPlus,  
+   FaBookOpen, FaHeart, 
   FaWhatsapp, FaFacebook, FaTwitter, FaTelegram,
-  FaEnvelope, FaLink, FaCopy, FaCheckCircle,
-  FaSpinner, FaArrowLeft, FaUserGraduate,
-  FaPray, FaBible, FaCross, FaStar, FaRegStar,
-  FaBook, FaUser, FaCalendar, FaEye, FaTimesCircle
+  FaLink,FaCheckCircle,
+  FaSpinner, FaArrowLeft, 
+  FaPray, FaBible, 
+  FaBook, FaEye, FaTimesCircle
 } from 'react-icons/fa';
 import { useAuth } from '../auth/context/AuthContext';
 import { useAdmin } from '../auth/context/AdminContext';
@@ -38,8 +38,8 @@ interface SermonData {
 const JoinSermon: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, user } = useAuth();
-  const { refreshAllSermons } = useAdmin();
+  const { isAuthenticated } = useAuth();
+  const {  } = useAdmin();
   
   const [isLoading, setIsLoading] = useState(true);
   const [isJoining, setIsJoining] = useState(false);

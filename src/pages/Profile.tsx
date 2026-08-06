@@ -7,10 +7,9 @@ import {
   FaUser, FaEnvelope, FaPhone, FaChurch, 
   FaMapMarkerAlt, FaCity, FaStreetView, FaInfoCircle,
   FaEdit, FaSave, FaTimes, FaCamera, FaUserEdit,
-  FaGraduationCap, FaAward, FaLemon, FaUsers,
+  FaGraduationCap, FaAward,
   FaCheckCircle, FaSpinner, FaArrowLeft, FaCalendarAlt,
-  FaUserCircle, FaCog, FaSignOutAlt, FaBook, FaCertificate,
-  FaUserGraduate, FaChalkboardTeacher, FaClipboardList
+  FaUserCircle, FaCog, FaSignOutAlt, FaBook, FaCertificate
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
@@ -212,11 +211,11 @@ const Profile: React.FC = () => {
       .slice(0, 2);
   };
 
-  const getProfilePicture = () => {
+  const getProfilePicture = (): string | undefined => {
     if (user?.profile?.profile_picture) {
       return user.profile.profile_picture;
     }
-    return null;
+    return undefined;
   };
 
   const getRoleDisplayName = () => {
@@ -629,7 +628,7 @@ const Profile: React.FC = () => {
             </div>
           </Link>
           <Link
-            to="/sermons"
+            to="/student/exams"
             className="flex items-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <FaBook className="text-2xl text-gray-500 mr-4" />

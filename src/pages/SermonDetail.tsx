@@ -1,5 +1,5 @@
 // src/pages/SermonDetail.tsx
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   FaHeart, FaComment, FaShare, FaBookmark, 
@@ -36,6 +36,12 @@ interface SermonData {
   published_at: string | null;
   updated_at: string;
 }
+
+// interface ExamAnswer {
+//   questionId: string;
+//   answer: string | string[];
+//   maxScore: number;
+// }
 
 const SermonDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -171,7 +177,7 @@ const SermonDetail: React.FC = () => {
         toast.success('Liked this sermon!');
       } else {
         localStorage.removeItem(`liked_${id}`);
-        toast.info('Unliked sermon');
+        toast('Unliked sermon', { icon: <FaHeart className="text-gray-400" /> });
       }
       
       const response = await sermonsAPI.get(sermonId);
@@ -251,7 +257,7 @@ const SermonDetail: React.FC = () => {
       toast.success('Bookmarked this sermon!');
       localStorage.setItem(`bookmarked_${id}`, 'true');
     } else {
-      toast.info('Removed bookmark');
+      toast('Removed bookmark', { icon: <FaBookmark className="text-gray-400" /> });
       localStorage.removeItem(`bookmarked_${id}`);
     }
   };
@@ -323,7 +329,7 @@ const SermonDetail: React.FC = () => {
 
     // Validate all required questions are answered
     const requiredQuestions = questions.filter((q: any) => q.required);
-    const unansweredRequired = requiredQuestions.filter((q: any, index: number) => {
+    const unansweredRequired = requiredQuestions.filter((q: any) => {
       const questionIndex = questions.indexOf(q);
       const answer = examAnswers[questionIndex];
       return !answer || (Array.isArray(answer) && answer.length === 0);
@@ -367,12 +373,13 @@ const SermonDetail: React.FC = () => {
 
       console.log('📤 Submitting exam with answers:', formattedAnswers);
 
-      // Submit to backend database with student_id
-      await submitExam(sermon.id, {
+      // Submit to backend database
+      const examData = {
         answers: formattedAnswers,
-        timeTaken: timeTaken,
-        student_id: user.id
-      });
+        timeTaken: timeTaken
+      };
+
+      await submitExam(sermon.id, examData);
 
       setExamSubmitted(true);
       setHasExistingSubmission(true);

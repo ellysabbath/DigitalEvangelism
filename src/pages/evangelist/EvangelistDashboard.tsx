@@ -2,51 +2,27 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  FaUsers, FaLemon, FaGraduationCap, FaShare, 
+  FaUsers, FaGraduationCap, FaShare, 
   FaQrcode, FaPlus, FaSearch, FaEye, FaEdit,
   FaCheckCircle, FaClock, FaExclamationCircle,
   FaChartLine, FaUserPlus, FaDownload, FaPrint,
   FaWhatsapp, FaFacebook, FaTwitter, 
-  FaTelegram, FaEnvelope, FaLink, FaCopy,
+  FaTelegram, FaEnvelope, FaCopy,
   FaTimes, FaSpinner, FaFileAlt, FaTrash,
-  FaCalendarAlt, FaUserGraduate, FaClipboardList,
-  FaBible, FaQuestion, FaTag, FaFire, FaCross,
-  FaCheckSquare, FaList, FaEdit as FaEditIcon,
-  FaHeart, FaComment, FaThumbsUp, FaArrowLeft,
-  FaBook, FaUserTie, FaCertificate, FaInstagram,
-  FaLinkedin, FaYoutube, FaTiktok, FaCheck
+  FaCalendarAlt, FaUserGraduate,
+  FaHeart, FaArrowLeft,
+  FaLinkedin, FaInstagram,
+   FaTiktok, FaCheck
 } from 'react-icons/fa';
 import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
-import { FaRadio } from 'react-icons/fa6';
 import { useAuth } from '../../auth/context/AuthContext';
 import { useAdmin } from '../../auth/context/AdminContext';
-import { sermonsAPI, studentsAPI } from '../../services/api';
+import { studentsAPI } from '../../services/api';
 
 // ============================================
 // TYPES
 // ============================================
-
-interface Student {
-  id: number;
-  user: number;
-  full_name: string;
-  email: string;
-  phone: string;
-  student_id: string;
-  enrollment_date: string;
-  graduation_date: string | null;
-  is_graduated: boolean;
-  exams_completed: number;
-  certificates_earned: number;
-  total_score: number;
-  groups: number[];
-  assigned_evangelist: number | null;
-  status: 'active' | 'pending' | 'graduated' | 'completed';
-  progress: number;
-  created_at: string;
-  updated_at: string;
-}
 
 interface Sermon {
   id: number;
@@ -185,7 +161,7 @@ interface QRCodeModalProps {
   onPrintQR: () => void;
   onShareQR: () => void;
   copied: boolean;
-  qrRef: React.RefObject<HTMLDivElement>;
+  qrRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const QRCodeModal: React.FC<QRCodeModalProps> = ({
@@ -250,7 +226,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
           {/* QR Code and Share Options */}
           <div className="flex flex-col md:flex-row items-center gap-8">
             {/* QR Code */}
-            <div ref={qrRef} className="flex-shrink-0 p-4 bg-white rounded-xl shadow-md border border-gray-200">
+            <div ref={qrRef as React.RefObject<HTMLDivElement>} className="flex-shrink-0 p-4 bg-white rounded-xl shadow-md border border-gray-200">
               <QRCodeSVG
                 value={qrValue}
                 size={220}
@@ -398,7 +374,7 @@ const FullSermonViewModal: React.FC<FullSermonViewModalProps> = ({
       <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
           <div className="flex items-center space-x-3">
-            <FaLemon className="text-white text-2xl" />
+            <FaFileAlt className="text-white text-2xl" />
             <div>
               <h3 className="text-white font-bold text-xl">{sermon.title}</h3>
               <p className="text-cyan-100 text-sm">Topic: {sermon.topic}</p>
@@ -436,7 +412,7 @@ const FullSermonViewModal: React.FC<FullSermonViewModalProps> = ({
           {sermon.scripture && (
             <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
               <p className="text-sm font-semibold text-purple-700 flex items-center">
-                <FaBible className="mr-2" /> Scripture
+                <FaFileAlt className="mr-2" /> Scripture
               </p>
               <p className="text-sm text-purple-600 font-serif italic">"{sermon.scripture}"</p>
             </div>
@@ -444,7 +420,7 @@ const FullSermonViewModal: React.FC<FullSermonViewModalProps> = ({
 
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
-              <FaLemon className="mr-2 text-cyan-500" /> Sermon Content
+              <FaFileAlt className="mr-2 text-cyan-500" /> Sermon Content
             </h4>
             <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 max-h-64 overflow-y-auto">
               <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
@@ -521,7 +497,6 @@ const EvangelistDashboard: React.FC = () => {
   // ========== STATE ==========
   const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'exams' | 'sermons'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
   const [selectedSermon, setSelectedSermon] = useState<Sermon | null>(null);
   const [shareLink, setShareLink] = useState('');
   const [copied, setCopied] = useState(false);
@@ -573,12 +548,13 @@ const EvangelistDashboard: React.FC = () => {
   // FILTERED DATA
   // ============================================
 
-  const myStudents = students.filter((student: Student) => 
+  // Use any type to avoid Student interface conflicts
+  const myStudents = students.filter((student: any) => 
     student.assigned_evangelist === evangelists?.[0]?.id || 
     student.assigned_evangelist === user?.id
   );
 
-  const filteredStudents = myStudents.filter((student: Student) =>
+  const filteredStudents = myStudents.filter((student: any) =>
     student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.student_id?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -593,7 +569,7 @@ const EvangelistDashboard: React.FC = () => {
     exam.sermon_title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredSermons = sermons.filter((sermon: Sermon) => {
+  const filteredSermons = sermons.filter((sermon: any) => {
     const matchesSearch = sermon.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           sermon.topic?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || sermon.status === filterStatus;
@@ -606,15 +582,15 @@ const EvangelistDashboard: React.FC = () => {
 
   const stats = {
     totalStudents: myStudents.length,
-    activeStudents: myStudents.filter((s: Student) => s.status === 'active').length,
+    activeStudents: myStudents.filter((s: any) => s.status === 'active').length,
     pendingExams: pendingExams.length,
-    totalSermons: sermons.filter((s: Sermon) => s.author === user?.id || s.author === evangelists?.[0]?.id).length,
+    totalSermons: sermons.filter((s: any) => s.author === user?.id || s.author === evangelists?.[0]?.id).length,
     averageScore: examSubmissions
       .filter((e: any) => e.status === 'graded' && e.percentage > 0)
       .reduce((acc: number, e: any) => acc + (e.percentage || 0), 0) / 
       (examSubmissions.filter((e: any) => e.status === 'graded' && e.percentage > 0).length || 1),
     completionRate: myStudents.length > 0 
-      ? Math.round(myStudents.reduce((acc: number, s: Student) => acc + (s.progress || 0), 0) / myStudents.length)
+      ? Math.round(myStudents.reduce((acc: number, s: any) => acc + (s.progress || 0), 0) / myStudents.length)
       : 0,
   };
 
@@ -627,7 +603,7 @@ const EvangelistDashboard: React.FC = () => {
       case 'active': return <FaCheckCircle className="text-green-500" />;
       case 'pending': return <FaClock className="text-yellow-500" />;
       case 'graduated': return <FaGraduationCap className="text-blue-500" />;
-      case 'completed': return <FaCertificate className="text-purple-500" />;
+      case 'completed': return <FaCheckCircle className="text-purple-500" />;
       default: return <FaExclamationCircle className="text-red-500" />;
     }
   };
@@ -652,14 +628,12 @@ const EvangelistDashboard: React.FC = () => {
 
   // Open QR Code Modal
   const handleOpenQRModal = (sermonId: number) => {
-    const sermon = sermons.find((s: Sermon) => s.id === sermonId);
+    const sermon = sermons.find((s: any) => s.id === sermonId);
     if (!sermon) {
       toast.error('Sermon not found');
       return;
     }
 
-    setIsGenerating(true);
-    
     // Generate QR code value
     const baseUrl = window.location.origin;
     const uniqueId = `sermon-${sermon.id}-${Date.now()}`;
@@ -669,7 +643,6 @@ const EvangelistDashboard: React.FC = () => {
     setShareLink(value);
     setSelectedSermon(sermon);
     setShowQRModal(true);
-    setIsGenerating(false);
   };
 
   // Copy link to clipboard
@@ -712,7 +685,7 @@ const EvangelistDashboard: React.FC = () => {
     };
 
     if (platform === 'instagram' || platform === 'tiktok') {
-      toast.info(`Downloading QR code for ${platform.charAt(0).toUpperCase() + platform.slice(1)} sharing...`);
+      toast(`Downloading QR code for ${platform.charAt(0).toUpperCase() + platform.slice(1)} sharing...`, { icon: <FaDownload className="text-cyan-500" /> });
       downloadQRCode();
       setTimeout(() => {
         toast.success(`QR Code downloaded! You can now share it on ${platform.charAt(0).toUpperCase() + platform.slice(1)}.`);
@@ -826,7 +799,7 @@ const EvangelistDashboard: React.FC = () => {
   // ACTION HANDLERS
   // ============================================
 
-  const handleViewFullSermon = (sermon: Sermon) => {
+  const handleViewFullSermon = (sermon: any) => {
     setViewingSermon(sermon);
     setShowFullViewModal(true);
   };
@@ -835,7 +808,7 @@ const EvangelistDashboard: React.FC = () => {
     navigate(`/admin/sermons/edit/${sermonId}`);
   };
 
-  const handleDeleteSermon = (sermon: Sermon) => {
+  const handleDeleteSermon = (sermon: any) => {
     setConfirmAction({
       type: 'delete',
       id: sermon.id,
@@ -845,7 +818,7 @@ const EvangelistDashboard: React.FC = () => {
     setShowConfirmModal(true);
   };
 
-  const handlePublishSermon = (sermon: Sermon) => {
+  const handlePublishSermon = (sermon: any) => {
     setConfirmAction({
       type: 'publish',
       id: sermon.id,
@@ -855,7 +828,7 @@ const EvangelistDashboard: React.FC = () => {
     setShowConfirmModal(true);
   };
 
-  const handleArchiveSermon = (sermon: Sermon) => {
+  const handleArchiveSermon = (sermon: any) => {
     setConfirmAction({
       type: 'archive',
       id: sermon.id,
@@ -875,7 +848,7 @@ const EvangelistDashboard: React.FC = () => {
     setShowConfirmModal(true);
   };
 
-  const handleDeleteStudent = (student: Student) => {
+  const handleDeleteStudent = (student: any) => {
     setConfirmAction({
       type: 'delete_student',
       id: student.id,
@@ -902,7 +875,7 @@ const EvangelistDashboard: React.FC = () => {
           toast.success(`Sermon "${confirmAction.title}" published successfully!`);
           break;
         case 'archive':
-          await updateSermon(confirmAction.id, { status: 'archived' });
+          await updateSermon(confirmAction.id, { status: 'archived' } as any);
           await refreshAllSermons();
           toast.success(`Sermon "${confirmAction.title}" archived successfully!`);
           break;
@@ -1098,7 +1071,7 @@ const EvangelistDashboard: React.FC = () => {
                   </div>
                 </div>
                 <button onClick={() => setActiveTab('exams')} className="text-sm text-yellow-600 hover:text-yellow-700 font-medium">
-                  Grade Now →
+                  Grade Now <FaArrowLeft className="inline ml-1 rotate-180" />
                 </button>
               </div>
             </div>
@@ -1111,11 +1084,11 @@ const EvangelistDashboard: React.FC = () => {
                 Recent Students
               </h3>
               <button onClick={() => setActiveTab('students')} className="text-sm text-cyan-600 hover:text-cyan-700 font-medium">
-                View All →
+                View All <FaArrowLeft className="inline ml-1 rotate-180" />
               </button>
             </div>
             <div className="space-y-3">
-              {myStudents.slice(0, 3).map((student: Student) => (
+              {myStudents.slice(0, 3).map((student: any) => (
                 <div key={student.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-600 font-semibold">
@@ -1166,7 +1139,7 @@ const EvangelistDashboard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredStudents.map((student: Student) => (
+            {filteredStudents.map((student: any) => (
               <div key={student.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-6 border-l-4 border-cyan-500">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
@@ -1309,7 +1282,7 @@ const EvangelistDashboard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredSermons.map((sermon: Sermon) => (
+            {filteredSermons.map((sermon: any) => (
               <div key={sermon.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-6 border-l-4 border-cyan-500">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -1326,7 +1299,7 @@ const EvangelistDashboard: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <FaLemon className="text-cyan-500 flex-shrink-0 ml-2" />
+                  <FaFileAlt className="text-cyan-500 flex-shrink-0 ml-2" />
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <span className="text-xs text-gray-500">
@@ -1387,7 +1360,7 @@ const EvangelistDashboard: React.FC = () => {
 
           {filteredSermons.length === 0 && (
             <div className="bg-white rounded-xl shadow-md p-8 text-center">
-              <FaLemon className="text-4xl text-gray-300 mx-auto mb-3" />
+              <FaFileAlt className="text-4xl text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">No sermons found</p>
               <Link to="/admin/create-sermon" className="inline-block mt-2 text-cyan-600 hover:text-cyan-700 font-medium">
                 Share your first sermon

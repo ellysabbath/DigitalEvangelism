@@ -2,36 +2,18 @@
 import axios from 'axios';
 import type { 
   RegisterData, 
-  RegisterResponse, 
-  LoginResponse, 
-  VerifyResponse, 
+  
   User,
-  CheckUserCodesResponse,
-  GenerateLoginCodesResponse,
-  UserCRUD,
+ 
   UserCreateData,
   UserUpdateData,
   BulkCreateData,
-  BulkCreateResponse,
-  FilterOptions,
-  UserStats,
-  Student,
-  StudentStats,
-  Evangelist,
-  EvangelistStats,
-  Group,
-  Certificate,
-  CertificateStats,
-  Sermon,
-  SermonStats,
-  Comment,
-  CommentStats,
-  EvangelismActivity,
-  EvangelismActivityStats,
-  SoulWinning,
-  SoulWinningStats,
-  EvangelismReport,
-  ExamFilterParams // ADD THIS IMPORT
+  
+  ExamFilterParams,
+  EvangelistCreateData,
+  EvangelistUpdateData,
+  GroupCreateData,
+  GroupUpdateData
 } from '../types/data';
 
 // ============================================
@@ -111,17 +93,25 @@ api.interceptors.response.use(
 // ============================================
 export const authAPI = {
   register: (data: RegisterData) => api.post('/auth/register/', data),
-  login: (phoneNumber: string, code: string) => api.post('/auth/login/', { phone_number: phoneNumber, verification_code: code }),
-  checkUserCodes: (phoneNumber: string) => api.post('/auth/check-user-codes/', { phone_number: phoneNumber }),
-  generateLoginCodes: (phoneNumber: string) => api.post('/auth/generate-login-codes/', { phone_number: phoneNumber }),
-  verify: (phoneNumber: string, code: string) => api.post('/auth/verify/', { phone_number: phoneNumber, verification_code: code }),
-  resendVerification: (phoneNumber: string) => api.post('/auth/resend-verification/', { phone_number: phoneNumber }),
-  fetchVerificationCodes: (phoneNumber: string) => api.post('/auth/fetch-codes/', { phone_number: phoneNumber }),
+  login: (phoneNumber: string, code: string) => 
+    api.post('/auth/login/', { phone_number: phoneNumber, verification_code: code }),
+  checkUserCodes: (phoneNumber: string) => 
+    api.post('/auth/check-user-codes/', { phone_number: phoneNumber }),
+  generateLoginCodes: (phoneNumber: string) => 
+    api.post('/auth/generate-login-codes/', { phone_number: phoneNumber }),
+  verify: (phoneNumber: string, code: string) => 
+    api.post('/auth/verify/', { phone_number: phoneNumber, verification_code: code }),
+  resendVerification: (phoneNumber: string) => 
+    api.post('/auth/resend-verification/', { phone_number: phoneNumber }),
+  fetchVerificationCodes: (phoneNumber: string) => 
+    api.post('/auth/fetch-codes/', { phone_number: phoneNumber }),
   getProfile: () => api.get('/auth/profile/'),
   updateProfile: (data: any) => api.patch('/auth/profile/', data),
-  updateProfilePicture: (profilePicture: string) => api.post('/auth/profile/picture/', { profile_picture: profilePicture }),
+  updateProfilePicture: (profilePicture: string) => 
+    api.post('/auth/profile/picture/', { profile_picture: profilePicture }),
   logout: () => api.post('/auth/logout/'),
-  checkUser: (phoneNumber: string) => api.post('/auth/check-user/', { phone_number: phoneNumber }),
+  checkUser: (phoneNumber: string) => 
+    api.post('/auth/check-user/', { phone_number: phoneNumber }),
   getAuthStats: () => api.get('/auth/stats/'),
   getVerificationLogs: () => api.get('/auth/verification-logs/'),
   getSessions: () => api.get('/auth/sessions/'),
@@ -137,32 +127,78 @@ export const crudAPI = {
   getUserStats: () => api.get('/auth/crud/stats/'),
   getUser: (id: number) => api.get(`/auth/crud/users/${id}/`),
   createUser: (data: UserCreateData) => api.post('/auth/crud/users/', data),
-  updateUser: (id: number, data: UserUpdateData) => api.patch(`/auth/crud/users/${id}/`, data),
-  replaceUser: (id: number, data: UserCreateData) => api.put(`/auth/crud/users/${id}/`, data),
+  updateUser: (id: number, data: UserUpdateData) => 
+    api.patch(`/auth/crud/users/${id}/`, data),
+  replaceUser: (id: number, data: UserCreateData) => 
+    api.put(`/auth/crud/users/${id}/`, data),
   deleteUser: (id: number) => api.delete(`/auth/crud/users/${id}/`),
-  hardDeleteUser: (id: number) => api.delete(`/auth/crud/users/${id}/hard-delete/`),
-  activateUser: (id: number) => api.post(`/auth/crud/users/${id}/activate/`),
-  deactivateUser: (id: number) => api.post(`/auth/crud/users/${id}/deactivate/`),
-  updateUserRole: (id: number, role: string) => api.patch(`/auth/crud/users/${id}/role/`, { role }),
-  bulkCreateUsers: (data: BulkCreateData) => api.post('/auth/crud/users/bulk/create/', data),
-  bulkDeleteUsers: (userIds: number[]) => api.delete('/auth/crud/users/bulk/delete/', { data: { user_ids: userIds } }),
-  bulkHardDeleteUsers: (userIds: number[]) => api.delete('/auth/crud/users/bulk/hard-delete/', { data: { user_ids: userIds } }),
-  bulkActivateUsers: (userIds: number[]) => api.post('/auth/crud/users/bulk/activate/', { user_ids: userIds }),
-  bulkDeactivateUsers: (userIds: number[]) => api.post('/auth/crud/users/bulk/deactivate/', { user_ids: userIds }),
-  bulkUpdateRoles: (updates: Array<{ id: number; role: string }>) => api.patch('/auth/crud/users/bulk/roles/', { updates }),
+  hardDeleteUser: (id: number) => 
+    api.delete(`/auth/crud/users/${id}/hard-delete/`),
+  activateUser: (id: number) => 
+    api.post(`/auth/crud/users/${id}/activate/`),
+  deactivateUser: (id: number) => 
+    api.post(`/auth/crud/users/${id}/deactivate/`),
+  updateUserRole: (id: number, role: string) => 
+    api.patch(`/auth/crud/users/${id}/role/`, { role }),
+  bulkCreateUsers: (data: BulkCreateData) => 
+    api.post('/auth/crud/users/bulk/create/', data),
+  bulkDeleteUsers: (userIds: number[]) => 
+    api.delete('/auth/crud/users/bulk/delete/', { data: { user_ids: userIds } }),
+  bulkHardDeleteUsers: (userIds: number[]) => 
+    api.delete('/auth/crud/users/bulk/hard-delete/', { data: { user_ids: userIds } }),
+  bulkActivateUsers: (userIds: number[]) => 
+    api.post('/auth/crud/users/bulk/activate/', { user_ids: userIds }),
+  bulkDeactivateUsers: (userIds: number[]) => 
+    api.post('/auth/crud/users/bulk/deactivate/', { user_ids: userIds }),
+  bulkUpdateRoles: (updates: Array<{ id: number; role: string }>) => 
+    api.patch('/auth/crud/users/bulk/roles/', { updates }),
 };
 
 // ============================================
-// STUDENTS API
+// STUDENTS API - FIXED
 // ============================================
 export const studentsAPI = {
   list: (params?: any) => api.get('/students/', { params }),
-  create: (data: { user_id: number; assigned_evangelist?: number; groups?: number[] }) => api.post('/students/create/', data),
+  create: (data: { 
+    user_id: number; 
+    assigned_evangelist?: number | null; 
+    groups?: number[] 
+  }) => {
+    // Clean the data - only include fields that have values
+    const cleanData: any = { 
+      user_id: data.user_id 
+    };
+    
+    // Only include assigned_evangelist if it's a valid number or null
+    if (data.assigned_evangelist !== undefined) {
+      cleanData.assigned_evangelist = data.assigned_evangelist;
+    }
+    
+    // Only include groups if it has items
+    if (data.groups && data.groups.length > 0) {
+      cleanData.groups = data.groups;
+    }
+    
+    return api.post('/students/create/', cleanData);
+  },
   get: (id: number) => api.get(`/students/${id}/`),
-  update: (id: number, data: any) => api.patch(`/students/${id}/update/`, data),
+  update: (id: number, data: any) => {
+    // Clean the data for update
+    const cleanData: any = {};
+    
+    // Only include fields that have values
+    Object.keys(data).forEach(key => {
+      if (data[key] !== undefined && data[key] !== null) {
+        cleanData[key] = data[key];
+      }
+    });
+    
+    return api.patch(`/students/${id}/update/`, cleanData);
+  },
   delete: (id: number) => api.delete(`/students/${id}/delete/`),
   stats: () => api.get('/students/stats/'),
-  bulkDelete: (ids: number[]) => api.delete('/students/bulk-delete/', { data: { student_ids: ids } }),
+  bulkDelete: (ids: number[]) => 
+    api.delete('/students/bulk-delete/', { data: { student_ids: ids } }),
 };
 
 // ============================================
@@ -170,9 +206,33 @@ export const studentsAPI = {
 // ============================================
 export const evangelistsAPI = {
   list: (params?: any) => api.get('/evangelists/', { params }),
-  create: (data: EvangelistCreateData) => api.post('/evangelists/create/', data),
+  create: (data: EvangelistCreateData) => {
+    // Clean the data
+    const cleanData: any = {};
+    
+    Object.keys(data).forEach(key => {
+      const value = data[key as keyof EvangelistCreateData];
+      if (value !== undefined && value !== null) {
+        cleanData[key] = value;
+      }
+    });
+    
+    return api.post('/evangelists/create/', cleanData);
+  },
   get: (id: number) => api.get(`/evangelists/${id}/`),
-  update: (id: number, data: EvangelistUpdateData) => api.patch(`/evangelists/${id}/update/`, data),
+  update: (id: number, data: EvangelistUpdateData) => {
+    // Clean the data
+    const cleanData: any = {};
+    
+    Object.keys(data).forEach(key => {
+      const value = data[key as keyof EvangelistUpdateData];
+      if (value !== undefined && value !== null) {
+        cleanData[key] = value;
+      }
+    });
+    
+    return api.patch(`/evangelists/${id}/update/`, cleanData);
+  },
   delete: (id: number) => api.delete(`/evangelists/${id}/delete/`),
   stats: () => api.get('/evangelists/stats/'),
 };
@@ -182,12 +242,38 @@ export const evangelistsAPI = {
 // ============================================
 export const groupsAPI = {
   list: (params?: any) => api.get('/groups/', { params }),
-  create: (data: GroupCreateData) => api.post('/groups/create/', data),
+  create: (data: GroupCreateData) => {
+    // Clean the data
+    const cleanData: any = {};
+    
+    Object.keys(data).forEach(key => {
+      const value = data[key as keyof GroupCreateData];
+      if (value !== undefined && value !== null) {
+        cleanData[key] = value;
+      }
+    });
+    
+    return api.post('/groups/create/', cleanData);
+  },
   get: (id: number) => api.get(`/groups/${id}/`),
-  update: (id: number, data: GroupUpdateData) => api.patch(`/groups/${id}/update/`, data),
+  update: (id: number, data: GroupUpdateData) => {
+    // Clean the data
+    const cleanData: any = {};
+    
+    Object.keys(data).forEach(key => {
+      const value = data[key as keyof GroupUpdateData];
+      if (value !== undefined && value !== null) {
+        cleanData[key] = value;
+      }
+    });
+    
+    return api.patch(`/groups/${id}/update/`, cleanData);
+  },
   delete: (id: number) => api.delete(`/groups/${id}/delete/`),
-  addMember: (id: number, userId: number) => api.post(`/groups/${id}/add-member/`, { user_id: userId }),
-  removeMember: (id: number, userId: number) => api.delete(`/groups/${id}/remove-member/`, { data: { user_id: userId } }),
+  addMember: (id: number, userId: number) => 
+    api.post(`/groups/${id}/add-member/`, { user_id: userId }),
+  removeMember: (id: number, userId: number) => 
+    api.delete(`/groups/${id}/remove-member/`, { data: { user_id: userId } }),
 };
 
 // ============================================
@@ -221,9 +307,11 @@ export const sermonsAPI = {
 // ============================================
 export const commentsAPI = {
   list: (sermonId: number) => api.get(`/comments/sermon/${sermonId}/`),
-  create: (sermonId: number, data: { content: string; parent?: number }) => api.post(`/comments/sermon/${sermonId}/create/`, data),
+  create: (sermonId: number, data: { content: string; parent?: number }) => 
+    api.post(`/comments/sermon/${sermonId}/create/`, data),
   get: (id: number) => api.get(`/comments/${id}/`),
-  update: (id: number, data: { content: string }) => api.patch(`/comments/${id}/update/`, data),
+  update: (id: number, data: { content: string }) => 
+    api.patch(`/comments/${id}/update/`, data),
   delete: (id: number) => api.delete(`/comments/${id}/delete/`),
   like: (id: number) => api.post(`/comments/${id}/like/`),
   stats: (sermonId: number) => api.get(`/comments/sermon/${sermonId}/stats/`),
@@ -261,6 +349,42 @@ export const evangelismAPI = {
 };
 
 // ============================================
+// EXAM SUBMISSION API (Sermon-based exams)
+// ============================================
+export const examAPI = {
+  // Submissions
+  listSubmissions: (params?: ExamFilterParams) => 
+    api.get('/exam/submissions/', { params }),
+  
+  getSubmission: (id: number) => 
+    api.get(`/exam/submissions/${id}/`),
+  
+  gradeSubmission: (id: number, data: { 
+    answers: { questionId: string; score: number; feedback: string }[]; 
+    feedback?: string 
+  }) => api.post(`/exam/submissions/${id}/grade/`, data),
+  
+  getSubmissionStats: (sermonId: number) => 
+    api.get(`/exam/sermon/${sermonId}/submissions/stats/`),
+  
+  getExamAnalytics: (sermonId: number) => 
+    api.get(`/exam/sermon/${sermonId}/analytics/`),
+  
+  getStudentExams: (studentId: number) => 
+    api.get(`/exam/student/?studentId=${studentId}`),
+  
+  // Submit exam to backend
+  submitExam: (sermonId: number, data: { 
+    answers: { questionId: string; answer: string | string[]; maxScore: number }[];
+    timeTaken: number;
+  }) => api.post(`/exam/sermon/${sermonId}/submit/`, data),
+  
+  // Check if user has submitted
+  checkSubmission: (sermonId: number, studentId: number) => 
+    api.get(`/exam/sermon/${sermonId}/check/?studentId=${studentId}`),
+};
+
+// ============================================
 // UTILITY FUNCTIONS
 // ============================================
 export const setAuthTokens = (access: string, refresh?: string) => {
@@ -290,46 +414,6 @@ export const saveUser = (user: User) => localStorage.setItem('user', JSON.string
 export const getAuthHeaders = () => {
   const token = localStorage.getItem('access_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
-
-
-
-
-// ============================================
-// EXAM SUBMISSION API (Sermon-based exams)
-// ============================================
-export const examAPI = {
-  // Submissions
-  listSubmissions: (params?: ExamFilterParams) => 
-    api.get('/exam/submissions/', { params }),
-  
-  getSubmission: (id: number) => 
-    api.get(`/exam/submissions/${id}/`),
-  
-  gradeSubmission: (id: number, data: { 
-    answers: { questionId: string; score: number; feedback: string }[]; 
-    feedback?: string 
-  }) => api.post(`/exam/submissions/${id}/grade/`, data),
-  
-  getSubmissionStats: (sermonId: number) => 
-    api.get(`/exam/sermon/${sermonId}/submissions/stats/`),
-  
-  getExamAnalytics: (sermonId: number) => 
-    api.get(`/exam/sermon/${sermonId}/analytics/`),
-  
-  getStudentExams: (studentId: number) => 
-    api.get(`/exam/student/?studentId=${studentId}`),
-  
-  // ========== NEW: Submit exam to backend ==========
-  submitExam: (sermonId: number, data: { 
-    answers: { questionId: string; answer: string | string[]; maxScore: number }[];
-    timeTaken: number;
-  }) => api.post(`/exam/sermon/${sermonId}/submit/`, data),
-  
-  // ========== NEW: Check if user has submitted ==========
-  checkSubmission: (sermonId: number, studentId: number) => 
-    api.get(`/exam/sermon/${sermonId}/check/?studentId=${studentId}`),
 };
 
 // ============================================

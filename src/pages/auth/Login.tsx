@@ -1,4 +1,4 @@
-// src/pages/Login.tsx
+// src/pages/auth/Login.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,7 +28,8 @@ import {
   FaTimes,
   FaExclamationTriangle,
   FaKey,
-  FaSync
+  FaSync,
+  FaHome
 } from 'react-icons/fa';
 
 // Types
@@ -434,7 +435,7 @@ const Login: React.FC = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-3">
-                <span className="text-2xl text-cyan-600">⛪</span>
+                <FaChurch className="text-2xl text-cyan-600" />
                 <span className="text-xl font-bold text-cyan-600">Digital Evangelism</span>
               </div>
               <div className="flex items-center space-x-4">
@@ -497,7 +498,7 @@ const Login: React.FC = () => {
                         Settings
                       </Link>
                       <Link to="/dashboard" className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-cyan-600 transition-colors" onClick={() => setIsProfileDropdownOpen(false)}>
-                        <FaChurch className="mr-3 text-gray-400" />
+                        <FaHome className="mr-3 text-gray-400" />
                         Dashboard
                       </Link>
                     </div>
@@ -688,11 +689,13 @@ const Login: React.FC = () => {
                     Welcome back, <strong className="mx-1">{userName}</strong>!
                     {userVerified ? (
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        ✓ Verified
+                        <FaCheckCircle className="mr-1 text-xs" />
+                        Verified
                       </span>
                     ) : (
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        ⚠️ Not Verified
+                        <FaExclamationTriangle className="mr-1 text-xs" />
+                        Not Verified
                       </span>
                     )}
                   </p>
@@ -726,7 +729,9 @@ const Login: React.FC = () => {
                       {code.map((digit, index) => (
                         <input
                           key={index}
-                          ref={(el) => (inputRefs.current[index] = el)}
+                          ref={(el) => {
+                            inputRefs.current[index] = el;
+                          }}
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"

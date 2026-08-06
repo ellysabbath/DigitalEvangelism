@@ -40,7 +40,7 @@ interface AdminContextType {
   // Users
   users: UserCRUD[];
   loadingUsers: boolean;
-  userError: string | null;
+  loadingUsersError: string | null;
   
   // Students
   students: Student[];
@@ -216,7 +216,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
   // Users
   const [users, setUsers] = useState<UserCRUD[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [userError, setUserError] = useState<string | null>(null);
+  const [loadingUsersError, setLoadingUsersError] = useState<string | null>(null);
 
   // Students
   const [students, setStudents] = useState<Student[]>([]);
@@ -266,22 +266,62 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // ============================================
-  // USER FUNCTIONS
+  // USER FUNCTIONS - FIXED
   // ============================================
-  const refreshUsers = useCallback(async () => {
-    setLoadingUsers(true);
-    setUserError(null);
-    try {
-      const response = await crudAPI.listUsers();
-      setUsers(response.data);
-    } catch (err: any) {
-      const message = err.response?.data?.error || 'Failed to load users';
-      setUserError(message);
-      toast.error(message);
-    } finally {
-      setLoadingUsers(false);
+// src/context/AdminContext.tsx - Fixed refreshUsers function
+
+const refreshUsers = useCallback(async () => {
+  setLoadingUsers(true);
+  setLoadingUsersError(null);
+  try {
+    console.log('🔄 [AdminContext] Fetching users from API...');
+    const response = await crudAPI.listUsers();
+    console.log('📦 [AdminContext] Users API Response:', response);
+    
+    // Handle different response formats
+    let usersData: UserCRUD[] = [];
+    
+    // Check if response exists
+    if (response) {
+      // Case 1: response.data is an array directly
+      if (Array.isArray(response.data)) {
+        usersData = response.data;
+      } 
+      // Case 2: response.data has a results property (paginated response)
+      else if (response.data && typeof response.data === 'object' && 'results' in response.data && Array.isArray(response.data.results)) {
+        usersData = response.data.results;
+      } 
+      // Case 3: response.data has a data property that is an array
+      else if (response.data && typeof response.data === 'object' && 'data' in response.data && Array.isArray(response.data.data)) {
+        usersData = response.data.data;
+      }
+      // Case 4: response itself is an array (if axios returns array directly)
+      else if (Array.isArray(response)) {
+        usersData = response;
+      }
+      // Case 5: response has results property (if response is not wrapped in data)
+      else if (response && typeof response === 'object' && 'results' in response && Array.isArray(response.results)) {
+        usersData = response.results;
+      }
     }
-  }, []);
+    
+    console.log(`[AdminContext] Processed ${usersData.length} users`);
+    console.log(' [AdminContext] Users data:', usersData);
+    
+    setUsers(usersData);
+    
+    if (usersData.length === 0) {
+      console.warn('[AdminContext] No users found in the system');
+    }
+  } catch (err: any) {
+    console.error(' [AdminContext] Error fetching users:', err);
+    const message = err.response?.data?.error || err.message || 'Failed to load users';
+    setLoadingUsersError(message);
+    toast.error(message);
+  } finally {
+    setLoadingUsers(false);
+  }
+}, []);
 
   const deleteUser = useCallback(async (id: number) => {
     try {
@@ -852,10 +892,8 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
   }, []);
 
   // ============================================
-  // EXAM FUNCTIONS - BACKEND INTEGRATION
+  // EXAM FUNCTIONS
   // ============================================
-  
-  // Refresh exam submissions from backend
   const refreshExamSubmissions = useCallback(async (params?: ExamFilterParams) => {
     setLoadingExams(true);
     setExamError(null);
@@ -871,7 +909,6 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Get single submission
   const getSubmission = useCallback(async (id: number): Promise<ExamSubmission> => {
     try {
       const response = await examAPI.getSubmission(id);
@@ -883,7 +920,6 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Grade a submission
   const gradeExamSubmission = useCallback(async (id: number, data: { 
     answers: { questionId: string; score: number; feedback: string }[]; 
     feedback?: string 
@@ -899,7 +935,6 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Get exam stats
   const getExamStats = useCallback(async (sermonId: number): Promise<ExamStats> => {
     try {
       const response = await examAPI.getSubmissionStats(sermonId);
@@ -912,7 +947,6 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Get exam analytics
   const getExamAnalytics = useCallback(async (sermonId: number): Promise<ExamAnalytics> => {
     try {
       const response = await examAPI.getExamAnalytics(sermonId);
@@ -924,7 +958,6 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Get student exams
   const getStudentExams = useCallback(async (studentId: number): Promise<ExamSubmission[]> => {
     try {
       const response = await examAPI.getStudentExams(studentId);
@@ -936,7 +969,6 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // ========== NEW: Submit exam to backend database ==========
   const submitExam = useCallback(async (sermonId: number, data: { 
     answers: { questionId: string; answer: string | string[]; maxScore: number }[];
     timeTaken: number;
@@ -952,7 +984,6 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // ========== NEW: Check if user has submitted ==========
   const checkSubmission = useCallback(async (sermonId: number, studentId: number): Promise<boolean> => {
     try {
       const response = await examAPI.checkSubmission(sermonId, studentId);
@@ -969,16 +1000,21 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadAll = async () => {
       setLoading(true);
-      await Promise.all([
-        refreshAllStudents(),
-        refreshAllEvangelists(),
-        refreshAllGroups(),
-        refreshAllSermons(),
-        refreshAllEvangelism(),
-        refreshUsers(),
-        refreshExamSubmissions()
-      ]);
-      setLoading(false);
+      try {
+        await Promise.all([
+          refreshAllStudents(),
+          refreshAllEvangelists(),
+          refreshAllGroups(),
+          refreshAllSermons(),
+          refreshAllEvangelism(),
+          refreshUsers(),
+          refreshExamSubmissions()
+        ]);
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadAll();
   }, []);
@@ -990,7 +1026,7 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
     // Users
     users,
     loadingUsers,
-    userError,
+    loadingUsersError: loadingUsersError,
     
     // Students
     students,

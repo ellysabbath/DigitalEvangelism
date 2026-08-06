@@ -1,10 +1,29 @@
-// src/pages/VerifyAccount.tsx
+// src/pages/auth/VerifyAccount.tsx
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../auth/context/AuthContext';
+import { 
+  FaSpinner, 
+  FaCheckCircle, 
+  FaTimesCircle, 
+  FaCopy, 
+  FaEye, 
+  FaEyeSlash,
+  FaSync,
+  FaClock,
+  FaKey,
+  FaShieldAlt,
+  FaArrowLeft,
+  FaEnvelope,
+  FaBolt,
+  FaClipboard,
+  FaInfoCircle,
+  FaExclamationTriangle,
+ 
+} from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
 const verifySchema = z.object({
@@ -29,7 +48,6 @@ const VerifyAccount: React.FC = () => {
   const [isVerified, setIsVerified] = useState<boolean>(false);
   const [mockCode, setMockCode] = useState<string>('');
   const [isCodeVisible, setIsCodeVisible] = useState<boolean>(true);
-  const [codeCopied, setCodeCopied] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [allCodes, setAllCodes] = useState<string[]>([]);
   const [codesReceived, setCodesReceived] = useState<boolean>(false);
@@ -75,7 +93,7 @@ const VerifyAccount: React.FC = () => {
         setCodesReceived(true);
         toast.success('Verification codes loaded!');
       } else {
-        toast.warning('No verification codes found. Please register again.');
+        toast.error('No verification codes found. Please register again.');
         navigate('/join');
       }
     } catch (error: any) {
@@ -185,9 +203,7 @@ const VerifyAccount: React.FC = () => {
   const copyCode = (code: string) => {
     if (code && code.length === 6) {
       navigator.clipboard.writeText(code);
-      setCodeCopied(true);
       toast.success('Code copied to clipboard!');
-      setTimeout(() => setCodeCopied(false), 3000);
     }
   };
 
@@ -260,7 +276,7 @@ const VerifyAccount: React.FC = () => {
   const autoVerify = () => {
     if (mockCode) {
       setValue('verificationCode', mockCode);
-      toast.info('Auto-filling verification code...');
+      toast('Auto-filling verification code...', { icon: <FaBolt className="text-yellow-500" /> });
       setTimeout(() => {
         handleSubmit(onSubmit)();
       }, 500);
@@ -276,7 +292,7 @@ const VerifyAccount: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <FaSpinner className="animate-spin text-4xl text-green-500 mx-auto mb-4" />
           <p className="text-gray-600">Loading verification details...</p>
         </div>
       </div>
@@ -290,9 +306,7 @@ const VerifyAccount: React.FC = () => {
           <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-8 py-6 text-center">
             <div className="flex justify-center mb-3">
               <div className="bg-white/20 backdrop-blur-sm p-3 rounded-2xl">
-                <div className="w-8 h-8 border-2 border-white rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  ✓
-                </div>
+                <FaCheckCircle className="text-3xl text-white" />
               </div>
             </div>
             <h1 className="text-2xl font-bold text-white">Verify Your Account</h1>
@@ -301,16 +315,15 @@ const VerifyAccount: React.FC = () => {
 
           <div className="p-8">
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
-                <p className="text-sm text-red-700">
-                  {error}
-                </p>
+              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start">
+                <FaTimesCircle className="text-red-500 mt-0.5 mr-2 flex-shrink-0" />
+                <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
 
             {isFetching ? (
               <div className="mb-6 p-8 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                <FaSpinner className="animate-spin text-4xl text-green-500 mx-auto mb-3" />
                 <p className="text-gray-600">Fetching your verification codes...</p>
               </div>
             ) : (
@@ -321,9 +334,7 @@ const VerifyAccount: React.FC = () => {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center space-x-2">
                         <div className="bg-green-100 p-2 rounded-lg">
-                          <div className="w-5 h-5 border-2 border-green-600 rounded flex items-center justify-center text-green-600 font-bold text-xs">
-                            #
-                          </div>
+                          <FaKey className="text-green-600" />
                         </div>
                         <div>
                           <h3 className="text-sm font-semibold text-green-700">Your Verification Codes</h3>
@@ -338,7 +349,7 @@ const VerifyAccount: React.FC = () => {
                           className="text-xs text-green-600 hover:text-green-700 bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:bg-green-50 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Refresh codes"
                         >
-                          <span className="mr-1">↻</span>
+                          <FaSync className="mr-1" />
                           Refresh
                         </button>
                         <button
@@ -346,7 +357,7 @@ const VerifyAccount: React.FC = () => {
                           onClick={copyAllCodes}
                           className="text-xs text-green-600 hover:text-green-700 bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:bg-green-50 transition-colors flex items-center"
                         >
-                          <span className="mr-1">📋</span>
+                          <FaClipboard className="mr-1" />
                           Copy All
                         </button>
                         <button
@@ -354,6 +365,7 @@ const VerifyAccount: React.FC = () => {
                           onClick={() => setIsCodeVisible(!isCodeVisible)}
                           className="text-xs text-green-600 hover:text-green-700 bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:bg-green-50 transition-colors flex items-center"
                         >
+                          {isCodeVisible ? <FaEye className="mr-1" /> : <FaEyeSlash className="mr-1" />}
                           {isCodeVisible ? 'Hide' : 'Show'}
                         </button>
                       </div>
@@ -372,7 +384,7 @@ const VerifyAccount: React.FC = () => {
                           onClick={() => {
                             setMockCode(code);
                             setValue('verificationCode', code);
-                            toast.info(`Using code: ${code}`);
+                            toast(`Using code: ${code}`, { icon: <FaKey className="text-green-500" /> });
                           }}
                         >
                           <div className="flex flex-col items-center">
@@ -390,12 +402,12 @@ const VerifyAccount: React.FC = () => {
                                 }}
                                 className="text-xs text-gray-400 hover:text-green-600 transition-colors flex items-center"
                               >
-                                <span className="mr-1">📋</span>
+                                <FaCopy className="mr-1" />
                                 Copy
                               </button>
                               {code === mockCode && (
                                 <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center">
-                                  <span className="mr-1">✓</span>
+                                  <FaCheckCircle className="mr-1 text-xs" />
                                   Selected
                                 </span>
                               )}
@@ -411,11 +423,11 @@ const VerifyAccount: React.FC = () => {
                     {/* Info about codes */}
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 border-t border-green-100 pt-3">
                       <div className="flex items-center space-x-2">
-                        <span className="text-green-400">ⓘ</span>
+                        <FaInfoCircle className="text-green-400" />
                         <span>Click any code to select it, or manually type below</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-green-400">⏱</span>
+                        <FaClock className="text-green-400" />
                         <span className={timeLeft < 60 ? 'text-red-500 font-semibold' : ''}>
                           {formatTime(timeLeft)}
                         </span>
@@ -425,7 +437,7 @@ const VerifyAccount: React.FC = () => {
 
                     {allCodes.length > 1 && (
                       <div className="mt-3 flex items-start space-x-2 bg-yellow-50 border border-yellow-200 rounded-lg p-2">
-                        <span className="text-yellow-600 text-sm mt-0.5">⚠</span>
+                        <FaExclamationTriangle className="text-yellow-600 text-sm mt-0.5" />
                         <p className="text-xs text-yellow-700">
                           <strong>Tip:</strong> You have {allCodes.length} verification codes available. 
                           Any one of them can be used to verify your account.
@@ -439,17 +451,17 @@ const VerifyAccount: React.FC = () => {
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-2 text-sm bg-gray-50 rounded-lg p-3">
                   <div className="flex items-center space-x-2">
                     <div className="bg-blue-100 p-1.5 rounded-full">
-                      <span className="text-blue-600 text-xs">📱</span>
+                      <FaEnvelope className="text-blue-600 text-xs" />
                     </div>
                     <span className="text-gray-700 font-medium">{phoneNumber}</span>
                     <span className="text-xs text-gray-400">|</span>
                     <span className="text-xs text-green-600 flex items-center">
-                      <span className="mr-1">✓</span>
+                      <FaCheckCircle className="mr-1" />
                       {codesReceived ? 'Codes ready' : 'Waiting for codes...'}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2 text-gray-500">
-                    <span className="text-gray-400">⏱</span>
+                    <FaClock className="text-gray-400" />
                     <span className={timeLeft < 60 ? 'text-red-500 font-semibold' : ''}>
                       {formatTime(timeLeft)}
                     </span>
@@ -464,7 +476,7 @@ const VerifyAccount: React.FC = () => {
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-400">🔑</span>
+                        <FaKey className="text-gray-400" />
                       </div>
                       <input
                         {...register('verificationCode')}
@@ -482,7 +494,7 @@ const VerifyAccount: React.FC = () => {
                       />
                       {verificationCode?.length === 6 && (
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                          <span className="text-green-500 text-xl">✓</span>
+                          <FaCheckCircle className="text-green-500 text-xl" />
                         </div>
                       )}
                     </div>
@@ -490,7 +502,7 @@ const VerifyAccount: React.FC = () => {
                       <p className="mt-1.5 text-sm text-red-500">{errors.verificationCode.message}</p>
                     )}
                     <p className="mt-1.5 text-xs text-gray-400 flex items-center">
-                      <span className="mr-1">ⓘ</span>
+                      <FaInfoCircle className="mr-1" />
                       Type the 6-digit code from the card above, or click a code to auto-fill
                     </p>
                   </div>
@@ -505,17 +517,17 @@ const VerifyAccount: React.FC = () => {
                     >
                       {isLoadingState ? (
                         <>
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
+                          <FaSpinner className="animate-spin mr-3" />
                           {isFetching ? 'Fetching Codes...' : 'Verifying...'}
                         </>
                       ) : isVerified ? (
                         <>
-                          <span className="mr-3">✓</span>
+                          <FaCheckCircle className="mr-3" />
                           Verified!
                         </>
                       ) : (
                         <>
-                          <span className="mr-3">🛡</span>
+                          <FaShieldAlt className="mr-3" />
                           Verify Account
                         </>
                       )}
@@ -527,7 +539,7 @@ const VerifyAccount: React.FC = () => {
                       className="px-6 py-3.5 text-sm font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center"
                       disabled={isLoadingState || !mockCode}
                     >
-                      <span className="mr-2">⚡</span>
+                      <FaBolt className="mr-2" />
                       Auto-Verify
                     </button>
                   </div>
@@ -537,27 +549,27 @@ const VerifyAccount: React.FC = () => {
                       type="button"
                       onClick={handleResendCode}
                       disabled={timeLeft > 0 || isLoadingState}
-                      className={`text-sm font-medium transition-colors ${
+                      className={`text-sm font-medium transition-colors flex items-center ${
                         timeLeft > 0 || isLoadingState
                           ? 'text-gray-400 cursor-not-allowed'
                           : 'text-green-600 hover:text-green-700 hover:underline'
                       }`}
                     >
                       {timeLeft > 0 ? (
-                        <span className="flex items-center">
-                          <span className="mr-2">⏱</span>
+                        <>
+                          <FaClock className="mr-2" />
                           New codes in {formatTime(timeLeft)}
-                        </span>
+                        </>
                       ) : (
-                        <span className="flex items-center">
-                          <span className="mr-2">📨</span>
+                        <>
+                          <FaSync className="mr-2" />
                           Generate New Codes
-                        </span>
+                        </>
                       )}
                     </button>
 
                     <Link to="/login" className="text-sm text-gray-500 hover:text-gray-700 flex items-center transition-colors">
-                      <span className="mr-2">←</span>
+                      <FaArrowLeft className="mr-2" />
                       Back to Login
                     </Link>
                   </div>
@@ -571,12 +583,12 @@ const VerifyAccount: React.FC = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl transform scale-100">
               <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-5xl text-green-600">✓</span>
+                <FaCheckCircle className="text-5xl text-green-600" />
               </div>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Verification Successful!</h2>
               <p className="text-gray-600 mb-4">Your account has been verified. Welcome to Digital Evangelism!</p>
               <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                <FaSpinner className="animate-spin" />
                 <span>Redirecting to dashboard...</span>
               </div>
             </div>

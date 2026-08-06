@@ -2,13 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  FaArrowLeft, FaEye, FaUsers, FaClock, 
+  FaArrowLeft, FaEye, FaClock, 
   FaPrint, FaShare, FaEdit, FaQuestion, 
-  FaCalendarAlt, FaTag, FaBible, FaBook, FaCheckCircle,
-  FaCross, FaSpinner, FaDownload, FaQrcode,
+  FaCalendarAlt, FaBible, FaBook, FaCheckCircle,
+  FaCross, FaSpinner,
   FaWhatsapp, FaFacebook, FaTwitter, FaTelegram, FaCopy,
-  FaStar, FaRegStar, FaFire, FaRocket, FaEdit as FaEditIcon,
-  FaList, FaCircle, FaTimesCircle, FaExclamationTriangle
+  FaEdit as FaEditIcon,
+  FaTimesCircle,
+  FaQrcode
 } from 'react-icons/fa';
 import { useAdmin } from '../../auth/context/AdminContext';
 import { sermonsAPI } from '../../services/api';
@@ -16,14 +17,6 @@ import toast from 'react-hot-toast';
 import { FaRadio } from 'react-icons/fa6';
 
 type QuestionType = 'short_answer' | 'long_answer' | 'checkbox' | 'radio' | 'true_false';
-
-interface Question {
-  id: string;
-  text: string;
-  type: QuestionType;
-  options?: string[];
-  required: boolean;
-}
 
 interface SermonData {
   id: number;
@@ -48,7 +41,7 @@ interface SermonData {
 const ViewSermon: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { refreshAllSermons } = useAdmin();
+  const { } = useAdmin();
   
   const [sermon, setSermon] = useState<SermonData | null>(null);
   const [loading, setLoading] = useState(true);

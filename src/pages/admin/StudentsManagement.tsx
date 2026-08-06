@@ -1,4 +1,4 @@
-// src/pages/admin/StudentsManagement.tsx
+// src/pages/admin/StudentsManagement.tsx (complete fixed version)
 import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, 
@@ -11,27 +11,15 @@ import {
   FaPhone, 
   FaArrowLeft, 
   FaCheckCircle, 
-  FaClock, 
   FaTimesCircle, 
   FaSpinner, 
   FaFilter, 
-  FaUserCheck, 
-  FaAward,
   FaSync,
-  FaChurch,
-  FaMapMarkerAlt,
   FaTimes,
   FaSave,
-  FaUser,
-  FaUsers,
-  FaExclamationTriangle,
-  FaUserPlus,
-  FaCalendar,
-  FaChartBar,
-  FaBook,
-  FaCertificate
+  FaExclamationTriangle
 } from 'react-icons/fa';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../auth/context/AdminContext';
 import { studentsAPI, groupsAPI } from '../../services/api';
 import type { Student, Group } from '../../types/data';
@@ -148,7 +136,6 @@ interface StudentModalProps {
   student?: Student | null;
   groups: Group[];
   users: any[];
-  isLoading?: boolean;
 }
 
 const StudentModal: React.FC<StudentModalProps> = ({
@@ -158,7 +145,6 @@ const StudentModal: React.FC<StudentModalProps> = ({
   student,
   groups,
   users,
-  isLoading = false
 }) => {
   const isEdit = !!student;
   const [formData, setFormData] = useState({
@@ -234,7 +220,7 @@ const StudentModal: React.FC<StudentModalProps> = ({
     try {
       if (isEdit && student) {
         await studentsAPI.update(student.id, {
-          assigned_evangelist: formData.assigned_evangelist,
+          assigned_evangelist: formData.assigned_evangelist || undefined,
           groups: formData.groups,
           exams_completed: formData.exams_completed,
           certificates_earned: formData.certificates_earned,
@@ -246,7 +232,7 @@ const StudentModal: React.FC<StudentModalProps> = ({
       } else {
         await studentsAPI.create({
           user_id: formData.user_id,
-          assigned_evangelist: formData.assigned_evangelist,
+          assigned_evangelist: formData.assigned_evangelist || undefined,
           groups: formData.groups,
         });
         toast.success('Student created successfully');
@@ -254,13 +240,14 @@ const StudentModal: React.FC<StudentModalProps> = ({
       onSuccess();
       onClose();
     } catch (error: any) {
+      console.error('Error saving student:', error);
       toast.error(error.response?.data?.error || 'Operation failed');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const availableUsers = users.filter(u => u.role === 'student' || u.role === 'evangelist');
+  const availableUsers = users;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
@@ -296,21 +283,30 @@ const StudentModal: React.FC<StudentModalProps> = ({
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 User <span className="text-red-500">*</span>
               </label>
-              <select
-                name="user_id"
-                value={formData.user_id || ''}
-                onChange={handleChange}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
-                disabled={isEdit || isSubmitting}
-                required
-              >
-                <option value="">Select a user</option>
-                {availableUsers.map(user => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name} ({user.email} - {user.phone_number})
-                  </option>
-                ))}
-              </select>
+              
+              {users.length === 0 ? (
+                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200 text-center">
+                  <p className="text-sm text-yellow-700">No users available. Please refresh the page.</p>
+                </div>
+              ) : (
+                <select
+                  name="user_id"
+                  value={formData.user_id || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
+                  disabled={isEdit || isSubmitting}
+                  required
+                >
+                  <option value="">Select a user</option>
+                  {availableUsers.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name || user.phone_number || 'Unknown'} 
+                      {user.email ? ` (${user.email})` : ''}
+                      {user.role ? ` - ${user.role}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
               {isEdit && (
                 <p className="text-xs text-gray-500 mt-1">User cannot be changed after creation</p>
               )}
@@ -329,9 +325,9 @@ const StudentModal: React.FC<StudentModalProps> = ({
                 disabled={isSubmitting}
               >
                 <option value="">None</option>
-                {users.filter(u => u.role === 'evangelist').map(user => (
+                {users.filter(u => u.role === 'evangelist' || u.role === 'admin').map(user => (
                   <option key={user.id} value={user.id}>
-                    {user.full_name} ({user.email})
+                    {user.full_name || user.phone_number} ({user.email})
                   </option>
                 ))}
               </select>
@@ -448,7 +444,7 @@ const StudentModal: React.FC<StudentModalProps> = ({
           <div className="mt-6 pt-4 border-t border-gray-200 flex gap-3">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || (users.length === 0)}
               className="flex-1 flex justify-center items-center py-2.5 px-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50"
             >
               {isSubmitting ? (
@@ -646,7 +642,6 @@ const StudentsManagement: React.FC = () => {
   const navigate = useNavigate();
   const { 
     students, 
-    studentStats, 
     loadingStudents, 
     studentError,
     refreshAllStudents, 
@@ -656,7 +651,8 @@ const StudentsManagement: React.FC = () => {
     getStudentStatsSummary,
     getStudentStatusBadge,
     users,
-    refreshUsers
+    refreshUsers,
+    
   } = useAdmin();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -666,7 +662,6 @@ const StudentsManagement: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [loadingGroups, setLoadingGroups] = useState(false);
 
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
@@ -687,22 +682,31 @@ const StudentsManagement: React.FC = () => {
   // Fetch groups
   useEffect(() => {
     const fetchGroups = async () => {
-      setLoadingGroups(true);
       try {
         const response = await groupsAPI.list();
         setGroups(response.data);
       } catch (error) {
         console.error('Error fetching groups:', error);
-      } finally {
-        setLoadingGroups(false);
       }
     };
     fetchGroups();
   }, []);
 
+  // Debug: Log users when they change
+  useEffect(() => {
+    console.log('📊 [StudentsManagement] Users updated:', users);
+    console.log('📊 [StudentsManagement] Users count:', users.length);
+  }, [users]);
+
   // Filtered students
-  const filteredStudents = filterStudents(searchQuery, filterStatus);
-  const statsSummary = getStudentStatsSummary();
+  const filteredStudents = filterStudents ? filterStudents(searchQuery, filterStatus) : [];
+  const statsSummary = getStudentStatsSummary ? getStudentStatsSummary() : {
+    total: 0,
+    active: 0,
+    pending: 0,
+    graduated: 0,
+    averageProgress: 0
+  };
 
   // ========== HANDLERS ==========
   const handleDelete = (id: number, name: string) => {
@@ -803,6 +807,7 @@ const StudentsManagement: React.FC = () => {
       super_admin: { label: 'Super Admin', className: 'bg-red-100 text-red-700' },
       admin: { label: 'Admin', className: 'bg-cyan-100 text-cyan-700' },
       student: { label: 'Student', className: 'bg-green-100 text-green-700' },
+      user: { label: 'User', className: 'bg-gray-100 text-gray-700' },
     };
     return roleMap[role] || { label: role || 'User', className: 'bg-gray-100 text-gray-700' };
   };
@@ -902,6 +907,7 @@ const StudentsManagement: React.FC = () => {
             <h2 className="text-2xl font-bold text-gray-900">Students Management</h2>
             <p className="text-sm text-gray-600">Manage all students in the system</p>
             <p className="text-xs text-gray-400 mt-1">{students.length} students found</p>
+            <p className="text-xs text-gray-400">Users available: {users.length}</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
@@ -1040,7 +1046,11 @@ const StudentsManagement: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredStudents.map((student: Student) => {
-                const status = getStudentStatusBadge(student);
+                const status = getStudentStatusBadge ? getStudentStatusBadge(student) : { 
+                  label: 'Unknown', 
+                  className: 'bg-gray-100 text-gray-700', 
+                  icon: null 
+                };
                 const role = getRoleBadge(student.user?.role || 'student');
                 return (
                   <tr key={student.id} className="hover:bg-gray-50 transition-colors">

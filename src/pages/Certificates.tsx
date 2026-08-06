@@ -4,9 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   FaAward, FaSearch, FaDownload, FaShare, 
   FaEye, FaCheckCircle, FaClock, FaPrint,
-  FaCertificate, FaQrcode, FaPlus, FaTimes,
-  FaUserGraduate, FaLemon, FaCalendarAlt, FaIdCard,
-  FaUser, FaEnvelope, FaPhone, FaChurch, FaMapMarkerAlt,
+  FaCertificate, FaTimes,
   FaSpinner, FaArrowLeft, FaFileAlt
 } from 'react-icons/fa';
 import { useAuth } from '../auth/context/AuthContext';
@@ -170,19 +168,6 @@ const Certificates: React.FC = () => {
       default:
         return null;
     }
-  };
-
-  const getPositionBadge = (position: string) => {
-    const styles: Record<string, string> = {
-      'ADMIN': 'bg-purple-100 text-purple-700',
-      'INSTRUCTOR': 'bg-blue-100 text-blue-700',
-      'STUDENT': 'bg-green-100 text-green-700',
-      'EVANGELIST': 'bg-orange-100 text-orange-700',
-      'PASTOR': 'bg-indigo-100 text-indigo-700',
-      'CHURCH_ADMIN': 'bg-cyan-100 text-cyan-700',
-      'OTHER': 'bg-gray-100 text-gray-700',
-    };
-    return styles[position] || 'bg-gray-100 text-gray-700';
   };
 
   // ============================================================
@@ -473,7 +458,7 @@ const Certificates: React.FC = () => {
             onClick={() => navigate('/sermons')}
             className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium"
           >
-            <FaLemon className="mr-2" />
+            <FaArrowLeft className="mr-2 transform rotate-180" />
             Browse Sermons
           </button>
         </div>

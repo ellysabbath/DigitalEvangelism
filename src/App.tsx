@@ -48,6 +48,8 @@ import GroupsView from './pages/admin/GroupsView';
 import UserManagement from './pages/admin/UserManagement';
 import CertificateManagement from './pages/admin/CertificateManagement';
 import Profile from './pages/Profile';
+import StudentDashboard from './pages/student/StudentDashboard';
+import SubscriptionsManagement from './pages/admin/SubscriptionsManagement';
 
 const App: React.FC = () => {
   return (
@@ -78,6 +80,8 @@ const App: React.FC = () => {
               <Route path="sermons/:id" element={<SermonDetail />} />
               <Route path="join/:sermonId" element={<JoinSermon />} />
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="students" element={<StudentDashboard />} />
+              <Route path="/admin/subscriptions" element={<SubscriptionsManagement />} />
               
               {/* Student Pages */}
               <Route path="student/exams" element={<MyExams />} />

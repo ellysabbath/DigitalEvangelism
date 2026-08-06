@@ -32,7 +32,7 @@ interface Question {
   type: string;
   options?: string[];
   required: boolean;
-  maxScore: number;
+  maxScore?: number;
 }
 
 interface Answer {
@@ -72,7 +72,7 @@ interface Submission {
 // ============================================
 const ExamManagement: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { } = useAuth();
   const { 
     examSubmissions, 
     loadingExams, 
@@ -139,16 +139,16 @@ const ExamManagement: React.FC = () => {
   // Update stats when submissions change
   useEffect(() => {
     const total = examSubmissions.length;
-    const pending = examSubmissions.filter((s: Submission) => s.status === 'pending').length;
-    const graded = examSubmissions.filter((s: Submission) => s.status === 'graded').length;
-    const reviewed = examSubmissions.filter((s: Submission) => s.status === 'reviewed').length;
+    const pending = examSubmissions.filter((s: any) => s.status === 'pending').length;
+    const graded = examSubmissions.filter((s: any) => s.status === 'graded').length;
+    const reviewed = examSubmissions.filter((s: any) => s.status === 'reviewed').length;
     
     const gradedSubmissions = examSubmissions.filter(
-      (s: Submission) => s.status === 'graded' || s.status === 'reviewed'
+      (s: any) => s.status === 'graded' || s.status === 'reviewed'
     );
     
     const avgScore = gradedSubmissions.length > 0 
-      ? gradedSubmissions.reduce((acc: number, s: Submission) => acc + (s.percentage || 0), 0) / gradedSubmissions.length 
+      ? gradedSubmissions.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0) / gradedSubmissions.length 
       : 0;
     
     setStats({
@@ -431,6 +431,17 @@ const ExamManagement: React.FC = () => {
     </div>
   );
 
+  // Filtered submissions - using any type to avoid type conflicts
+  const filteredSubmissions = examSubmissions.filter((sub: any) => {
+    const matchesStatus = filter.status === 'all' || sub.status === filter.status;
+    const matchesSearch = 
+      sub.student_name?.toLowerCase().includes(filter.search.toLowerCase()) ||
+      sub.student_email?.toLowerCase().includes(filter.search.toLowerCase()) ||
+      sub.sermon_title?.toLowerCase().includes(filter.search.toLowerCase());
+    const matchesSermon = filter.sermonId === '' || String(sub.sermon) === filter.sermonId;
+    return matchesStatus && matchesSearch && matchesSermon;
+  });
+
   const renderSubmissionsTable = () => {
     if (filteredSubmissions.length === 0) {
       return (
@@ -455,7 +466,7 @@ const ExamManagement: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filteredSubmissions.map((submission: Submission) => {
+            {filteredSubmissions.map((submission: any) => {
               const maxPossible = calculateMaxPossibleScore(submission);
               const totalScore = calculateTotalScore(submission);
               const percentage = maxPossible > 0 ? (totalScore / maxPossible) * 100 : 0;
@@ -562,17 +573,6 @@ const ExamManagement: React.FC = () => {
       </div>
     );
   };
-
-  // Filtered submissions
-  const filteredSubmissions = examSubmissions.filter((sub: Submission) => {
-    const matchesStatus = filter.status === 'all' || sub.status === filter.status;
-    const matchesSearch = 
-      sub.student_name?.toLowerCase().includes(filter.search.toLowerCase()) ||
-      sub.student_email?.toLowerCase().includes(filter.search.toLowerCase()) ||
-      sub.sermon_title?.toLowerCase().includes(filter.search.toLowerCase());
-    const matchesSermon = filter.sermonId === '' || sub.sermon === parseInt(filter.sermonId);
-    return matchesStatus && matchesSearch && matchesSermon;
-  });
 
   // ============================================
   // LOADING / ERROR STATES
@@ -692,7 +692,7 @@ const ExamManagement: React.FC = () => {
 
               {/* Questions and Answers */}
               <div className="space-y-4">
-                {(selectedSubmission.questions || []).map((question: Question, index: number) => {
+                {(selectedSubmission.questions || []).map((question: any, index: number) => {
                   // Find the answer using normalized ID matching
                   const answer = findAnswerForQuestion(selectedSubmission, question.id);
                   const studentAnswer = answer?.answer || 'No answer provided';
@@ -812,7 +812,7 @@ const ExamManagement: React.FC = () => {
                   <div>
                     <p className="text-sm text-gray-600">Max Possible</p>
                     <p className="text-xl font-bold text-gray-900">
-                      {(selectedSubmission.questions || []).reduce((sum: number, q: Question) => sum + (q.maxScore || 0), 0) || 
+                      {(selectedSubmission.questions || []).reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0) || 
                        selectedSubmission.max_possible_score || 0}
                     </p>
                   </div>
@@ -820,10 +820,10 @@ const ExamManagement: React.FC = () => {
                     <p className="text-sm text-gray-600">Percentage</p>
                     <p className={`text-xl font-bold ${getGradeColor(
                       (Object.values(editingAnswers).reduce((acc, curr) => acc + (curr.score || 0), 0) / 
-                      ((selectedSubmission.questions || []).reduce((sum: number, q: Question) => sum + (q.maxScore || 0), 0) || 1)) * 100
+                      ((selectedSubmission.questions || []).reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0) || 1)) * 100
                     )}`}>
                       {((Object.values(editingAnswers).reduce((acc, curr) => acc + (curr.score || 0), 0) / 
-                        ((selectedSubmission.questions || []).reduce((sum: number, q: Question) => sum + (q.maxScore || 0), 0) || 1)) * 100).toFixed(1)}%
+                        ((selectedSubmission.questions || []).reduce((sum: number, q: any) => sum + (q.maxScore || 0), 0) || 1)) * 100).toFixed(1)}%
                     </p>
                   </div>
                 </div>
@@ -923,7 +923,7 @@ const ExamManagement: React.FC = () => {
 
               {/* Questions and Answers */}
               <div className="space-y-4">
-                {(selectedSubmission.questions || []).map((question: Question, index: number) => {
+                {(selectedSubmission.questions || []).map((question: any, index: number) => {
                   // Find the answer using normalized ID matching
                   const answer = findAnswerForQuestion(selectedSubmission, question.id);
                   const studentAnswer = answer?.answer || 'No answer provided';
@@ -938,7 +938,7 @@ const ExamManagement: React.FC = () => {
                           <div className="flex items-center space-x-2 mb-2">
                             <span className="text-xs font-medium text-gray-500">Q{index + 1}</span>
                             <span className="text-xs text-gray-400">({getQuestionTypeLabel(question.type)})</span>
-                            {question.maxScore > 0 && (
+                            {question.maxScore && question.maxScore > 0 && (
                               <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
                                 Max: {question.maxScore} pts
                               </span>

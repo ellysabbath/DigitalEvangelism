@@ -1,4 +1,4 @@
-// src/pages/Register.tsx
+// src/pages/auth/Register.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,11 +10,12 @@ import {
   FaUser, FaPhone, FaEnvelope, FaChurch, FaMapMarkerAlt, 
   FaCity, FaStreetView, FaInfoCircle, FaUpload, FaSpinner,
   FaTimes, FaUserPlus, FaShieldAlt, FaChevronDown, FaSearch,
-  FaCheckCircle, FaGraduationCap, FaArrowLeft
+  FaCheckCircle, FaGraduationCap, FaArrowLeft,
+  
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-// Country codes data
+// Country codes data with flags as emojis (keeping flags as they are standard)
 const countryCodes: CountryCode[] = [
   { code: '+1', country: 'United States', flag: '🇺🇸' },
   { code: '+1', country: 'Canada', flag: '🇨🇦' },
@@ -113,7 +114,7 @@ const Register: React.FC = () => {
   
   // Phone check
   const [isCheckingPhone, setIsCheckingPhone] = useState<boolean>(false);
-  const [phoneExists, setPhoneExists] = useState<boolean | null>(null);
+  const [phoneExists, setPhoneExists] = useState<boolean>(false);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -154,18 +155,18 @@ const Register: React.FC = () => {
         setIsCheckingPhone(true);
         const cleanNumber = currentPhone.replace(/\s/g, '');
         const fullNumber = `${currentCountry}${cleanNumber}`;
-        console.log('🔍 Checking phone number:', fullNumber);
+        console.log('Checking phone number:', fullNumber);
         
         try {
           const exists = await checkUserExists(fullNumber);
-          setPhoneExists(exists);
+          setPhoneExists(!!exists);
         } catch (error) {
           console.error('Error checking phone:', error);
           setPhoneExists(false);
         }
         setIsCheckingPhone(false);
       } else {
-        setPhoneExists(null);
+        setPhoneExists(false);
       }
     };
 
@@ -284,7 +285,7 @@ const Register: React.FC = () => {
       // Build registration data
       const registrationData: RegisterData = {
         full_name: data.fullName.trim(),
-        phone_number: cleanPhoneNumber, // Only digits, NO country code
+        phone_number: cleanPhoneNumber,
         email: data.email.trim().toLowerCase(),
         country_code: data.countryCode,
         church_name: data.churchName?.trim() || '',
@@ -297,11 +298,11 @@ const Register: React.FC = () => {
         }
       };
 
-      console.log('📤 Sending registration data:', JSON.stringify(registrationData, null, 2));
+      console.log('Sending registration data:', JSON.stringify(registrationData, null, 2));
 
       const response = await registerUser(registrationData);
       
-      console.log('✅ Registration successful:', response);
+      console.log('Registration successful:', response);
       
       // Store registration data for verification
       localStorage.setItem('registration_data', JSON.stringify({
@@ -318,7 +319,7 @@ const Register: React.FC = () => {
       });
       
     } catch (error: any) {
-      console.error('❌ Registration error:', error);
+      console.error('Registration error:', error);
       
       let errorMsg = error.message || 'Registration failed. Please try again.';
       setSubmitError(errorMsg);

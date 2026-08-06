@@ -1,183 +1,730 @@
-model    from django.db import models
+from django.db import models
 
 # Create your models here.
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
-class Group(models.Model):
-    GROUP_TYPES = [
-        ('evangelist', 'Evangelist Group'),
-        ('student', 'Student Group'),
-        ('mixed', 'Mixed Group'),
-    ]
+class Student(models.Model):
+    """Student model extending User"""
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='student_profile'
+    )
     
-    name = models.CharField(max_length=255)
-    type = models.CharField(max_length=20, choices=GROUP_TYPES, default='student')
-    description = models.TextField(blank=True)
+    # Student specific fields
+    enrollment_date = models.DateTimeField(default=timezone.now)
+    graduation_date = models.DateTimeField(null=True, blank=True)
+    is_graduated = models.BooleanField(default=False)
+    student_id = models.CharField(max_length=50, unique=True, blank=True)
     
-    # Leader
-    leader = models.ForeignKey(
+    # Progress tracking
+    exams_completed = models.IntegerField(default=0)
+    certificates_earned = models.IntegerField(default=0)
+    total_score = models.FloatField(default=0.0)
+    
+    # Groups
+    groups = models.ManyToManyField(
+        'Groups.Group',
+        related_name='students',
+        blank=True
+    )
+    
+    # Evangelist assigned
+    assigned_evangelist = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='led_groups'
+        related_name='assigned_students',
+        limit_choices_to={'role': 'evangelist'}
     )
     
-    # Members (for student groups)
-    members = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        related_name='groups_member',
-        blank=True
-    )
-    
-    # Status
-    is_active = models.BooleanField(default=True)
-    
-    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        db_table = 'groups'
+        db_table = 'students'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['type']),
-            models.Index(fields=['is_active']),
+            models.Index(fields=['student_id']),
+            models.Index(fields=['enrollment_date']),
+            models.Index(fields=['is_graduated']),
         ]
     
     def __str__(self):
-        return f"{self.name} ({self.get_type_display()})"
+        return f"Student: {self.user.full_name} ({self.student_id})"
     
-    def get_member_count(self):
-        return self.members.count()
+    def save(self, *args, **kwargs):
+        if not self.student_id:
+            # Generate student ID
+            year = timezone.now().year
+            count = Student.objects.filter(
+                enrollment_date__year=year
+            ).count() + 1
+            self.student_id = f"STU-{year}-{count:04d}"
+        super().save(*args, **kwargs)
+    
+    def get_progress_percentage(self):
+        """Calculate progress based on exams completed"""
+        # Assuming 20 exams total for graduation
+        total_exams = 20
+        return min(100, (self.exams_completed / total_exams) * 100)
 
-    def get_leader_name(self):
-        return self.leader.full_name if self.leader else 'No leader assigned',    serializers    from rest_framework import serializers
-from .models import Group
+    def get_status(self):
+        """Get student status"""
+        if self.is_graduated:
+            return 'graduated'
+        if self.exams_completed >= 20:
+            return 'completed'
+        if self.exams_completed > 0:
+            return 'active'
+        return 'pending',   serializers  # Students/serializers.py
+from rest_framework import serializers
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from .models import Student
 from accounts.serializers import UserSerializer
+from Groups.models import Group  # ADD THIS IMPORT
 
-class GroupSerializer(serializers.ModelSerializer):
-    leader_name = serializers.SerializerMethodField()
-    member_count = serializers.SerializerMethodField()
-    members = UserSerializer(many=True, read_only=True)
+User = get_user_model()
+
+class StudentSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    full_name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    progress = serializers.SerializerMethodField()
     
     class Meta:
-        model = Group
+        model = Student
         fields = [
-            'id', 'name', 'type', 'description', 'leader',
-            'leader_name', 'members', 'member_count',
-            'is_active', 'created_at', 'updated_at'
+            'id', 'user', 'full_name', 'email', 'phone',
+            'student_id', 'enrollment_date', 'graduation_date',
+            'is_graduated', 'exams_completed', 'certificates_earned',
+            'total_score', 'groups', 'assigned_evangelist',
+            'status', 'progress', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'student_id', 'created_at', 'updated_at']
     
-    def get_leader_name(self, obj):
-        return obj.get_leader_name()
+    def get_full_name(self, obj):
+        return obj.user.full_name or obj.user.phone_number
     
-    def get_member_count(self, obj):
-        return obj.get_member_count(),  views  from django.shortcuts import render
+    def get_email(self, obj):
+        return obj.user.email
+    
+    def get_phone(self, obj):
+        return obj.user.get_full_phone_number()
+    
+    def get_status(self, obj):
+        return obj.get_status()
+    
+    def get_progress(self, obj):
+        return obj.get_progress_percentage()
+
+class StudentCreateSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(write_only=True)
+    groups = serializers.PrimaryKeyRelatedField(
+        many=True,
+        required=False,
+        queryset=Group.objects.all()  # Need to import Group
+    )
+    
+    class Meta:
+        model = Student
+        fields = [
+            'user_id', 'assigned_evangelist', 'groups'
+        ]
+    
+    def validate_user_id(self, value):
+        try:
+            user = User.objects.get(id=value)
+            if user.role not in ['student', 'evangelist']:
+                raise serializers.ValidationError("User must be a student or evangelist")
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found")
+        return value
+    
+    def create(self, validated_data):
+        user_id = validated_data.pop('user_id')
+        groups_data = validated_data.pop('groups', [])  # Remove groups from validated_data
+        
+        user = User.objects.get(id=user_id)
+        
+        # Check if student already exists
+        if Student.objects.filter(user=user).exists():
+            raise serializers.ValidationError("Student already exists for this user")
+        
+        # Create student without groups
+        student = Student.objects.create(user=user, **validated_data)
+        
+        # Add groups using set() method
+        if groups_data:
+            student.groups.set(groups_data)
+        
+        return student
+
+class StudentUpdateSerializer(serializers.ModelSerializer):
+    groups = serializers.PrimaryKeyRelatedField(
+        many=True,
+        required=False,
+        queryset=Group.objects.all()
+    )
+    
+    class Meta:
+        model = Student
+        fields = [
+            'assigned_evangelist', 'groups',
+            'exams_completed', 'certificates_earned',
+            'total_score', 'is_graduated', 'graduation_date'
+        ]
+    
+    def update(self, instance, validated_data):
+        groups_data = validated_data.pop('groups', None)
+        
+        # Update other fields
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        
+        # If graduation date is set, mark as graduated
+        if validated_data.get('graduation_date'):
+            instance.is_graduated = True
+        
+        instance.save()
+        
+        # Update groups using set() method
+        if groups_data is not None:
+            instance.groups.set(groups_data)
+        
+        return instance,  view  from django.shortcuts import render
 
 # Create your views here.
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.db.models import Q, Count
-from .models import Group
-from .serializers import GroupSerializer
+from django.db.models import Q, Count, Avg
+from django.utils import timezone
+from .models import Student
+from .serializers import (
+    StudentSerializer,
+    StudentCreateSerializer,
+    StudentUpdateSerializer
+)
 from accounts.models import User
 
-class GroupListView(generics.ListAPIView):
-    serializer_class = GroupSerializer
+class StudentListView(generics.ListAPIView):
+    """List all students with filters"""
+    serializer_class = StudentSerializer
     
     def get_queryset(self):
-        queryset = Group.objects.all()
+        queryset = Student.objects.all().select_related('user')
         
+        # Filter by search
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(
-                Q(name__icontains=search) |
-                Q(description__icontains=search)
+                Q(user__full_name__icontains=search) |
+                Q(user__email__icontains=search) |
+                Q(user__phone_number__icontains=search) |
+                Q(student_id__icontains=search)
             )
         
-        group_type = self.request.query_params.get('type')
-        if group_type:
-            queryset = queryset.filter(type=group_type)
-        
+        # Filter by status
         status_filter = self.request.query_params.get('status')
         if status_filter:
             if status_filter == 'active':
-                queryset = queryset.filter(is_active=True)
-            elif status_filter == 'inactive':
-                queryset = queryset.filter(is_active=False)
+                queryset = queryset.filter(
+                    is_graduated=False,
+                    exams_completed__gt=0,
+                    exams_completed__lt=20
+                )
+            elif status_filter == 'pending':
+                queryset = queryset.filter(exams_completed=0, is_graduated=False)
+            elif status_filter == 'graduated':
+                queryset = queryset.filter(is_graduated=True)
+            elif status_filter == 'completed':
+                queryset = queryset.filter(exams_completed__gte=20, is_graduated=False)
+        
+        # Filter by evangelist
+        evangelist_id = self.request.query_params.get('evangelist')
+        if evangelist_id:
+            queryset = queryset.filter(assigned_evangelist_id=evangelist_id)
+        
+        # Filter by group
+        group_id = self.request.query_params.get('group')
+        if group_id:
+            queryset = queryset.filter(groups__id=group_id)
+        
+        # Ordering
+        ordering = self.request.query_params.get('ordering', '-created_at')
+        if ordering in ['name', '-name']:
+            if ordering == 'name':
+                queryset = queryset.order_by('user__full_name')
+            else:
+                queryset = queryset.order_by('-user__full_name')
+        else:
+            queryset = queryset.order_by(ordering)
         
         return queryset
 
-class GroupCreateView(generics.CreateAPIView):
-    serializer_class = GroupSerializer
+class StudentCreateView(generics.CreateAPIView):
+    """Create a new student"""
+    serializer_class = StudentCreateSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-class GroupRetrieveView(generics.RetrieveAPIView):
-    queryset = Group.objects.all()
-    serializer_class = GroupSerializer
+class StudentRetrieveView(generics.RetrieveAPIView):
+    """Get student details"""
+    queryset = Student.objects.all().select_related('user')
+    serializer_class = StudentSerializer
 
-class GroupUpdateView(generics.UpdateAPIView):
-    queryset = Group.objects.all()
-    serializer_class = GroupSerializer
+class StudentUpdateView(generics.UpdateAPIView):
+    """Update student"""
+    queryset = Student.objects.all()
+    serializer_class = StudentUpdateSerializer
 
-class GroupDeleteView(generics.DestroyAPIView):
-    queryset = Group.objects.all()
+class StudentDeleteView(generics.DestroyAPIView):
+    """Delete student"""
+    queryset = Student.objects.all()
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # Instead of deleting, just remove the student relationship
+        instance.user.role = 'user'  # Reset role
+        instance.user.save()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-class GroupAddMemberView(APIView):
-    def post(self, request, pk):
-        user_id = request.data.get('user_id')
-        if not user_id:
-            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
+class StudentStatsView(APIView):
+    """Get student statistics"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        total = Student.objects.count()
+        active = Student.objects.filter(
+            is_graduated=False,
+            exams_completed__gt=0
+        ).count()
+        pending = Student.objects.filter(exams_completed=0, is_graduated=False).count()
+        graduated = Student.objects.filter(is_graduated=True).count()
         
-        try:
-            group = Group.objects.get(pk=pk)
-            user = User.objects.get(pk=user_id)
-            group.members.add(user)
-            return Response({'message': f'User {user.full_name} added to group'})
-        except Group.DoesNotExist:
-            return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-
-class GroupRemoveMemberView(APIView):
-    def delete(self, request, pk):
-        user_id = request.data.get('user_id')
-        if not user_id:
-            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        # Average progress
+        avg_progress = Student.objects.aggregate(
+            avg=Avg('exams_completed')
+        )['avg'] or 0
         
-        try:
-            group = Group.objects.get(pk=pk)
-            user = User.objects.get(pk=user_id)
-            group.members.remove(user)
-            return Response({'message': f'User {user.full_name} removed from group'})
-        except Group.DoesNotExist:
-            return Response({'error': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND),  urls   from django.urls import path
+        # Top students
+        top_students = Student.objects.filter(
+            is_graduated=False
+        ).order_by('-exams_completed')[:5]
+        
+        return Response({
+            'total': total,
+            'active': active,
+            'pending': pending,
+            'graduated': graduated,
+            'average_progress': round(avg_progress / 20 * 100, 2) if avg_progress else 0,
+            'top_students': StudentSerializer(top_students, many=True).data
+        })
+
+class StudentBulkDeleteView(APIView):
+    """Bulk delete students"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def delete(self, request):
+        student_ids = request.data.get('student_ids', [])
+        if not student_ids:
+            return Response({'error': 'student_ids required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        students = Student.objects.filter(id__in=student_ids)
+        deleted_count = students.count()
+        
+        # Reset user roles
+        for student in students:
+            student.user.role = 'user'
+            student.user.save()
+        
+        students.delete()
+        
+        return Response({
+            'message': f'{deleted_count} students deleted',
+            'deleted_count': deleted_count
+        }),  urls    from django.urls import path
 from .views import (
-    GroupListView,
-    GroupCreateView,
-    GroupRetrieveView,
-    GroupUpdateView,
-    GroupDeleteView,
-    GroupAddMemberView,
-    GroupRemoveMemberView
+    StudentListView,
+    StudentCreateView,
+    StudentRetrieveView,
+    StudentUpdateView,
+    StudentDeleteView,
+    StudentStatsView,
+    StudentBulkDeleteView
 )
 
 urlpatterns = [
-    path('', GroupListView.as_view(), name='group-list'),
-    path('create/', GroupCreateView.as_view(), name='group-create'),
-    path('<int:pk>/', GroupRetrieveView.as_view(), name='group-detail'),
-    path('<int:pk>/update/', GroupUpdateView.as_view(), name='group-update'),
-    path('<int:pk>/delete/', GroupDeleteView.as_view(), name='group-delete'),
-    path('<int:pk>/add-member/', GroupAddMemberView.as_view(), name='group-add-member'),
-    path('<int:pk>/remove-member/', GroupRemoveMemberView.as_view(), name='group-remove-member'),
-],    data.ts     // src/types/data.ts
+    path('', StudentListView.as_view(), name='student-list'),
+    path('create/', StudentCreateView.as_view(), name='student-create'),
+    path('<int:pk>/', StudentRetrieveView.as_view(), name='student-detail'),
+    path('<int:pk>/update/', StudentUpdateView.as_view(), name='student-update'),
+    path('<int:pk>/delete/', StudentDeleteView.as_view(), name='student-delete'),
+    path('stats/', StudentStatsView.as_view(), name='student-stats'),
+    path('bulk-delete/', StudentBulkDeleteView.as_view(), name='student-bulk-delete'),
+],      api.ts   // src/services/api.ts
+import axios from 'axios';
+import type { 
+  RegisterData, 
+  RegisterResponse, 
+  LoginResponse, 
+  VerifyResponse, 
+  User,
+  CheckUserCodesResponse,
+  GenerateLoginCodesResponse,
+  UserCRUD,
+  UserCreateData,
+  UserUpdateData,
+  BulkCreateData,
+  BulkCreateResponse,
+  FilterOptions,
+  UserStats,
+  Student,
+  StudentStats,
+  Evangelist,
+  EvangelistStats,
+  Group,
+  Certificate,
+  CertificateStats,
+  Sermon,
+  SermonStats,
+  Comment,
+  CommentStats,
+  EvangelismActivity,
+  EvangelismActivityStats,
+  SoulWinning,
+  SoulWinningStats,
+  EvangelismReport,
+  ExamFilterParams // ADD THIS IMPORT
+} from '../types/data';
+
+// ============================================
+// API CONFIGURATION
+// ============================================
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+  timeout: 30000,
+});
+
+// ============================================
+// REQUEST INTERCEPTOR
+// ============================================
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    console.error('Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// ============================================
+// RESPONSE INTERCEPTOR
+// ============================================
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+          const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
+            refresh: refreshToken,
+          });
+          
+          if (response.data.access) {
+            localStorage.setItem('access_token', response.data.access);
+            if (response.data.refresh) {
+              localStorage.setItem('refresh_token', response.data.refresh);
+            }
+            
+            originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
+            return api(originalRequest);
+          }
+        }
+      } catch (refreshError) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ============================================
+// AUTHENTICATION API
+// ============================================
+export const authAPI = {
+  register: (data: RegisterData) => api.post('/auth/register/', data),
+  login: (phoneNumber: string, code: string) => api.post('/auth/login/', { phone_number: phoneNumber, verification_code: code }),
+  checkUserCodes: (phoneNumber: string) => api.post('/auth/check-user-codes/', { phone_number: phoneNumber }),
+  generateLoginCodes: (phoneNumber: string) => api.post('/auth/generate-login-codes/', { phone_number: phoneNumber }),
+  verify: (phoneNumber: string, code: string) => api.post('/auth/verify/', { phone_number: phoneNumber, verification_code: code }),
+  resendVerification: (phoneNumber: string) => api.post('/auth/resend-verification/', { phone_number: phoneNumber }),
+  fetchVerificationCodes: (phoneNumber: string) => api.post('/auth/fetch-codes/', { phone_number: phoneNumber }),
+  getProfile: () => api.get('/auth/profile/'),
+  updateProfile: (data: any) => api.patch('/auth/profile/', data),
+  updateProfilePicture: (profilePicture: string) => api.post('/auth/profile/picture/', { profile_picture: profilePicture }),
+  logout: () => api.post('/auth/logout/'),
+  checkUser: (phoneNumber: string) => api.post('/auth/check-user/', { phone_number: phoneNumber }),
+  getAuthStats: () => api.get('/auth/stats/'),
+  getVerificationLogs: () => api.get('/auth/verification-logs/'),
+  getSessions: () => api.get('/auth/sessions/'),
+  getAuthLogs: () => api.get('/auth/auth-logs/'),
+};
+
+// ============================================
+// USER CRUD API
+// ============================================
+export const crudAPI = {
+  listUsers: (params?: any) => api.get('/auth/crud/users/', { params }),
+  getFilterOptions: () => api.get('/auth/crud/filters/'),
+  getUserStats: () => api.get('/auth/crud/stats/'),
+  getUser: (id: number) => api.get(`/auth/crud/users/${id}/`),
+  createUser: (data: UserCreateData) => api.post('/auth/crud/users/', data),
+  updateUser: (id: number, data: UserUpdateData) => api.patch(`/auth/crud/users/${id}/`, data),
+  replaceUser: (id: number, data: UserCreateData) => api.put(`/auth/crud/users/${id}/`, data),
+  deleteUser: (id: number) => api.delete(`/auth/crud/users/${id}/`),
+  hardDeleteUser: (id: number) => api.delete(`/auth/crud/users/${id}/hard-delete/`),
+  activateUser: (id: number) => api.post(`/auth/crud/users/${id}/activate/`),
+  deactivateUser: (id: number) => api.post(`/auth/crud/users/${id}/deactivate/`),
+  updateUserRole: (id: number, role: string) => api.patch(`/auth/crud/users/${id}/role/`, { role }),
+  bulkCreateUsers: (data: BulkCreateData) => api.post('/auth/crud/users/bulk/create/', data),
+  bulkDeleteUsers: (userIds: number[]) => api.delete('/auth/crud/users/bulk/delete/', { data: { user_ids: userIds } }),
+  bulkHardDeleteUsers: (userIds: number[]) => api.delete('/auth/crud/users/bulk/hard-delete/', { data: { user_ids: userIds } }),
+  bulkActivateUsers: (userIds: number[]) => api.post('/auth/crud/users/bulk/activate/', { user_ids: userIds }),
+  bulkDeactivateUsers: (userIds: number[]) => api.post('/auth/crud/users/bulk/deactivate/', { user_ids: userIds }),
+  bulkUpdateRoles: (updates: Array<{ id: number; role: string }>) => api.patch('/auth/crud/users/bulk/roles/', { updates }),
+};
+
+// ============================================
+// STUDENTS API
+// ============================================
+export const studentsAPI = {
+  list: (params?: any) => api.get('/students/', { params }),
+  create: (data: { user_id: number; assigned_evangelist?: number; groups?: number[] }) => api.post('/students/create/', data),
+  get: (id: number) => api.get(`/students/${id}/`),
+  update: (id: number, data: any) => api.patch(`/students/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/students/${id}/delete/`),
+  stats: () => api.get('/students/stats/'),
+  bulkDelete: (ids: number[]) => api.delete('/students/bulk-delete/', { data: { student_ids: ids } }),
+};
+
+// ============================================
+// EVANGELISTS API
+// ============================================
+export const evangelistsAPI = {
+  list: (params?: any) => api.get('/evangelists/', { params }),
+  create: (data: EvangelistCreateData) => api.post('/evangelists/create/', data),
+  get: (id: number) => api.get(`/evangelists/${id}/`),
+  update: (id: number, data: EvangelistUpdateData) => api.patch(`/evangelists/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/evangelists/${id}/delete/`),
+  stats: () => api.get('/evangelists/stats/'),
+};
+
+// ============================================
+// GROUPS API
+// ============================================
+export const groupsAPI = {
+  list: (params?: any) => api.get('/groups/', { params }),
+  create: (data: GroupCreateData) => api.post('/groups/create/', data),
+  get: (id: number) => api.get(`/groups/${id}/`),
+  update: (id: number, data: GroupUpdateData) => api.patch(`/groups/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/groups/${id}/delete/`),
+  addMember: (id: number, userId: number) => api.post(`/groups/${id}/add-member/`, { user_id: userId }),
+  removeMember: (id: number, userId: number) => api.delete(`/groups/${id}/remove-member/`, { data: { user_id: userId } }),
+};
+
+// ============================================
+// CERTIFICATES API
+// ============================================
+export const certificatesAPI = {
+  list: (params?: any) => api.get('/certificates/', { params }),
+  create: (data: any) => api.post('/certificates/create/', data),
+  get: (id: number) => api.get(`/certificates/${id}/`),
+  update: (id: number, data: any) => api.patch(`/certificates/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/certificates/${id}/delete/`),
+  issue: (id: number) => api.post(`/certificates/${id}/issue/`),
+  stats: () => api.get('/certificates/stats/'),
+};
+
+// ============================================
+// SERMONS API
+// ============================================
+export const sermonsAPI = {
+  list: (params?: any) => api.get('/sermons/', { params }),
+  create: (data: any) => api.post('/sermons/create/', data),
+  get: (id: number) => api.get(`/sermons/${id}/`),
+  update: (id: number, data: any) => api.patch(`/sermons/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/sermons/${id}/delete/`),
+  publish: (id: number) => api.post(`/sermons/${id}/publish/`),
+  stats: () => api.get('/sermons/stats/'),
+};
+
+// ============================================
+// COMMENTS API
+// ============================================
+export const commentsAPI = {
+  list: (sermonId: number) => api.get(`/comments/sermon/${sermonId}/`),
+  create: (sermonId: number, data: { content: string; parent?: number }) => api.post(`/comments/sermon/${sermonId}/create/`, data),
+  get: (id: number) => api.get(`/comments/${id}/`),
+  update: (id: number, data: { content: string }) => api.patch(`/comments/${id}/update/`, data),
+  delete: (id: number) => api.delete(`/comments/${id}/delete/`),
+  like: (id: number) => api.post(`/comments/${id}/like/`),
+  stats: (sermonId: number) => api.get(`/comments/sermon/${sermonId}/stats/`),
+};
+
+// ============================================
+// EVANGELISM API
+// ============================================
+export const evangelismAPI = {
+  activities: {
+    list: (params?: any) => api.get('/evangelism/activities/', { params }),
+    create: (data: any) => api.post('/evangelism/activities/create/', data),
+    get: (id: number) => api.get(`/evangelism/activities/${id}/`),
+    update: (id: number, data: any) => api.patch(`/evangelism/activities/${id}/update/`, data),
+    delete: (id: number) => api.delete(`/evangelism/activities/${id}/delete/`),
+    stats: () => api.get('/evangelism/activities/stats/'),
+  },
+  souls: {
+    list: (params?: any) => api.get('/evangelism/souls/', { params }),
+    create: (data: any) => api.post('/evangelism/souls/create/', data),
+    get: (id: number) => api.get(`/evangelism/souls/${id}/`),
+    update: (id: number, data: any) => api.patch(`/evangelism/souls/${id}/update/`, data),
+    delete: (id: number) => api.delete(`/evangelism/souls/${id}/delete/`),
+    stats: () => api.get('/evangelism/souls/stats/'),
+  },
+  reports: {
+    list: (params?: any) => api.get('/evangelism/reports/', { params }),
+    create: (data: any) => api.post('/evangelism/reports/create/', data),
+    get: (id: number) => api.get(`/evangelism/reports/${id}/`),
+    update: (id: number, data: any) => api.patch(`/evangelism/reports/${id}/update/`, data),
+    delete: (id: number) => api.delete(`/evangelism/reports/${id}/delete/`),
+    stats: (params?: any) => api.get('/evangelism/reports/stats/', { params }),
+  },
+  dashboard: () => api.get('/evangelism/dashboard/'),
+};
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+export const setAuthTokens = (access: string, refresh?: string) => {
+  localStorage.setItem('access_token', access);
+  if (refresh) localStorage.setItem('refresh_token', refresh);
+};
+
+export const clearAuthTokens = () => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user');
+};
+
+export const isAuthenticated = (): boolean => !!localStorage.getItem('access_token');
+
+export const getCurrentUser = (): User | null => {
+  try {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const saveUser = (user: User) => localStorage.setItem('user', JSON.stringify(user));
+
+export const getAuthHeaders = () => {
+  const token = localStorage.getItem('access_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+
+
+
+
+// ============================================
+// EXAM SUBMISSION API (Sermon-based exams)
+// ============================================
+export const examAPI = {
+  // Submissions
+  listSubmissions: (params?: ExamFilterParams) => 
+    api.get('/exam/submissions/', { params }),
+  
+  getSubmission: (id: number) => 
+    api.get(`/exam/submissions/${id}/`),
+  
+  gradeSubmission: (id: number, data: { 
+    answers: { questionId: string; score: number; feedback: string }[]; 
+    feedback?: string 
+  }) => api.post(`/exam/submissions/${id}/grade/`, data),
+  
+  getSubmissionStats: (sermonId: number) => 
+    api.get(`/exam/sermon/${sermonId}/submissions/stats/`),
+  
+  getExamAnalytics: (sermonId: number) => 
+    api.get(`/exam/sermon/${sermonId}/analytics/`),
+  
+  getStudentExams: (studentId: number) => 
+    api.get(`/exam/student/?studentId=${studentId}`),
+  
+  // ========== NEW: Submit exam to backend ==========
+  submitExam: (sermonId: number, data: { 
+    answers: { questionId: string; answer: string | string[]; maxScore: number }[];
+    timeTaken: number;
+  }) => api.post(`/exam/sermon/${sermonId}/submit/`, data),
+  
+  // ========== NEW: Check if user has submitted ==========
+  checkSubmission: (sermonId: number, studentId: number) => 
+    api.get(`/exam/sermon/${sermonId}/check/?studentId=${studentId}`),
+};
+
+// ============================================
+// DEFAULT EXPORT
+// ============================================
+export default {
+  api,
+  authAPI,
+  crudAPI,
+  studentsAPI,
+  examAPI,
+  evangelistsAPI,
+  groupsAPI,
+  certificatesAPI,
+  sermonsAPI,
+  commentsAPI,
+  evangelismAPI,
+  setAuthTokens,
+  clearAuthTokens,
+  isAuthenticated,
+  getCurrentUser,
+  saveUser,
+  getAuthHeaders,
+};,data.ts  // src/types/data.ts
 
 // ============================================
 // USER TYPES
@@ -882,362 +1429,7 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-},  api.ts    // src/services/api.ts
-import axios from 'axios';
-import type { 
-  RegisterData, 
-  RegisterResponse, 
-  LoginResponse, 
-  VerifyResponse, 
-  User,
-  CheckUserCodesResponse,
-  GenerateLoginCodesResponse,
-  UserCRUD,
-  UserCreateData,
-  UserUpdateData,
-  BulkCreateData,
-  BulkCreateResponse,
-  FilterOptions,
-  UserStats,
-  Student,
-  StudentStats,
-  Evangelist,
-  EvangelistStats,
-  Group,
-  Certificate,
-  CertificateStats,
-  Sermon,
-  SermonStats,
-  Comment,
-  CommentStats,
-  EvangelismActivity,
-  EvangelismActivityStats,
-  SoulWinning,
-  SoulWinningStats,
-  EvangelismReport,
-  ExamFilterParams // ADD THIS IMPORT
-} from '../types/data';
-
-// ============================================
-// API CONFIGURATION
-// ============================================
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
-  timeout: 30000,
-});
-
-// ============================================
-// REQUEST INTERCEPTOR
-// ============================================
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    console.error('Request Error:', error);
-    return Promise.reject(error);
-  }
-);
-
-// ============================================
-// RESPONSE INTERCEPTOR
-// ============================================
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
-            refresh: refreshToken,
-          });
-          
-          if (response.data.access) {
-            localStorage.setItem('access_token', response.data.access);
-            if (response.data.refresh) {
-              localStorage.setItem('refresh_token', response.data.refresh);
-            }
-            
-            originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
-            return api(originalRequest);
-          }
-        }
-      } catch (refreshError) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
-// ============================================
-// AUTHENTICATION API
-// ============================================
-export const authAPI = {
-  register: (data: RegisterData) => api.post('/auth/register/', data),
-  login: (phoneNumber: string, code: string) => api.post('/auth/login/', { phone_number: phoneNumber, verification_code: code }),
-  checkUserCodes: (phoneNumber: string) => api.post('/auth/check-user-codes/', { phone_number: phoneNumber }),
-  generateLoginCodes: (phoneNumber: string) => api.post('/auth/generate-login-codes/', { phone_number: phoneNumber }),
-  verify: (phoneNumber: string, code: string) => api.post('/auth/verify/', { phone_number: phoneNumber, verification_code: code }),
-  resendVerification: (phoneNumber: string) => api.post('/auth/resend-verification/', { phone_number: phoneNumber }),
-  fetchVerificationCodes: (phoneNumber: string) => api.post('/auth/fetch-codes/', { phone_number: phoneNumber }),
-  getProfile: () => api.get('/auth/profile/'),
-  updateProfile: (data: any) => api.patch('/auth/profile/', data),
-  updateProfilePicture: (profilePicture: string) => api.post('/auth/profile/picture/', { profile_picture: profilePicture }),
-  logout: () => api.post('/auth/logout/'),
-  checkUser: (phoneNumber: string) => api.post('/auth/check-user/', { phone_number: phoneNumber }),
-  getAuthStats: () => api.get('/auth/stats/'),
-  getVerificationLogs: () => api.get('/auth/verification-logs/'),
-  getSessions: () => api.get('/auth/sessions/'),
-  getAuthLogs: () => api.get('/auth/auth-logs/'),
-};
-
-// ============================================
-// USER CRUD API
-// ============================================
-export const crudAPI = {
-  listUsers: (params?: any) => api.get('/auth/crud/users/', { params }),
-  getFilterOptions: () => api.get('/auth/crud/filters/'),
-  getUserStats: () => api.get('/auth/crud/stats/'),
-  getUser: (id: number) => api.get(`/auth/crud/users/${id}/`),
-  createUser: (data: UserCreateData) => api.post('/auth/crud/users/', data),
-  updateUser: (id: number, data: UserUpdateData) => api.patch(`/auth/crud/users/${id}/`, data),
-  replaceUser: (id: number, data: UserCreateData) => api.put(`/auth/crud/users/${id}/`, data),
-  deleteUser: (id: number) => api.delete(`/auth/crud/users/${id}/`),
-  hardDeleteUser: (id: number) => api.delete(`/auth/crud/users/${id}/hard-delete/`),
-  activateUser: (id: number) => api.post(`/auth/crud/users/${id}/activate/`),
-  deactivateUser: (id: number) => api.post(`/auth/crud/users/${id}/deactivate/`),
-  updateUserRole: (id: number, role: string) => api.patch(`/auth/crud/users/${id}/role/`, { role }),
-  bulkCreateUsers: (data: BulkCreateData) => api.post('/auth/crud/users/bulk/create/', data),
-  bulkDeleteUsers: (userIds: number[]) => api.delete('/auth/crud/users/bulk/delete/', { data: { user_ids: userIds } }),
-  bulkHardDeleteUsers: (userIds: number[]) => api.delete('/auth/crud/users/bulk/hard-delete/', { data: { user_ids: userIds } }),
-  bulkActivateUsers: (userIds: number[]) => api.post('/auth/crud/users/bulk/activate/', { user_ids: userIds }),
-  bulkDeactivateUsers: (userIds: number[]) => api.post('/auth/crud/users/bulk/deactivate/', { user_ids: userIds }),
-  bulkUpdateRoles: (updates: Array<{ id: number; role: string }>) => api.patch('/auth/crud/users/bulk/roles/', { updates }),
-};
-
-// ============================================
-// STUDENTS API
-// ============================================
-export const studentsAPI = {
-  list: (params?: any) => api.get('/students/', { params }),
-  create: (data: { user_id: number; assigned_evangelist?: number; groups?: number[] }) => api.post('/students/create/', data),
-  get: (id: number) => api.get(`/students/${id}/`),
-  update: (id: number, data: any) => api.patch(`/students/${id}/update/`, data),
-  delete: (id: number) => api.delete(`/students/${id}/delete/`),
-  stats: () => api.get('/students/stats/'),
-  bulkDelete: (ids: number[]) => api.delete('/students/bulk-delete/', { data: { student_ids: ids } }),
-};
-
-// ============================================
-// EVANGELISTS API
-// ============================================
-export const evangelistsAPI = {
-  list: (params?: any) => api.get('/evangelists/', { params }),
-  create: (data: EvangelistCreateData) => api.post('/evangelists/create/', data),
-  get: (id: number) => api.get(`/evangelists/${id}/`),
-  update: (id: number, data: EvangelistUpdateData) => api.patch(`/evangelists/${id}/update/`, data),
-  delete: (id: number) => api.delete(`/evangelists/${id}/delete/`),
-  stats: () => api.get('/evangelists/stats/'),
-};
-
-// ============================================
-// GROUPS API
-// ============================================
-export const groupsAPI = {
-  list: (params?: any) => api.get('/groups/', { params }),
-  create: (data: GroupCreateData) => api.post('/groups/create/', data),
-  get: (id: number) => api.get(`/groups/${id}/`),
-  update: (id: number, data: GroupUpdateData) => api.patch(`/groups/${id}/update/`, data),
-  delete: (id: number) => api.delete(`/groups/${id}/delete/`),
-  addMember: (id: number, userId: number) => api.post(`/groups/${id}/add-member/`, { user_id: userId }),
-  removeMember: (id: number, userId: number) => api.delete(`/groups/${id}/remove-member/`, { data: { user_id: userId } }),
-};
-
-// ============================================
-// CERTIFICATES API
-// ============================================
-export const certificatesAPI = {
-  list: (params?: any) => api.get('/certificates/', { params }),
-  create: (data: any) => api.post('/certificates/create/', data),
-  get: (id: number) => api.get(`/certificates/${id}/`),
-  update: (id: number, data: any) => api.patch(`/certificates/${id}/update/`, data),
-  delete: (id: number) => api.delete(`/certificates/${id}/delete/`),
-  issue: (id: number) => api.post(`/certificates/${id}/issue/`),
-  stats: () => api.get('/certificates/stats/'),
-};
-
-// ============================================
-// SERMONS API
-// ============================================
-export const sermonsAPI = {
-  list: (params?: any) => api.get('/sermons/', { params }),
-  create: (data: any) => api.post('/sermons/create/', data),
-  get: (id: number) => api.get(`/sermons/${id}/`),
-  update: (id: number, data: any) => api.patch(`/sermons/${id}/update/`, data),
-  delete: (id: number) => api.delete(`/sermons/${id}/delete/`),
-  publish: (id: number) => api.post(`/sermons/${id}/publish/`),
-  stats: () => api.get('/sermons/stats/'),
-};
-
-// ============================================
-// COMMENTS API
-// ============================================
-export const commentsAPI = {
-  list: (sermonId: number) => api.get(`/comments/sermon/${sermonId}/`),
-  create: (sermonId: number, data: { content: string; parent?: number }) => api.post(`/comments/sermon/${sermonId}/create/`, data),
-  get: (id: number) => api.get(`/comments/${id}/`),
-  update: (id: number, data: { content: string }) => api.patch(`/comments/${id}/update/`, data),
-  delete: (id: number) => api.delete(`/comments/${id}/delete/`),
-  like: (id: number) => api.post(`/comments/${id}/like/`),
-  stats: (sermonId: number) => api.get(`/comments/sermon/${sermonId}/stats/`),
-};
-
-// ============================================
-// EVANGELISM API
-// ============================================
-export const evangelismAPI = {
-  activities: {
-    list: (params?: any) => api.get('/evangelism/activities/', { params }),
-    create: (data: any) => api.post('/evangelism/activities/create/', data),
-    get: (id: number) => api.get(`/evangelism/activities/${id}/`),
-    update: (id: number, data: any) => api.patch(`/evangelism/activities/${id}/update/`, data),
-    delete: (id: number) => api.delete(`/evangelism/activities/${id}/delete/`),
-    stats: () => api.get('/evangelism/activities/stats/'),
-  },
-  souls: {
-    list: (params?: any) => api.get('/evangelism/souls/', { params }),
-    create: (data: any) => api.post('/evangelism/souls/create/', data),
-    get: (id: number) => api.get(`/evangelism/souls/${id}/`),
-    update: (id: number, data: any) => api.patch(`/evangelism/souls/${id}/update/`, data),
-    delete: (id: number) => api.delete(`/evangelism/souls/${id}/delete/`),
-    stats: () => api.get('/evangelism/souls/stats/'),
-  },
-  reports: {
-    list: (params?: any) => api.get('/evangelism/reports/', { params }),
-    create: (data: any) => api.post('/evangelism/reports/create/', data),
-    get: (id: number) => api.get(`/evangelism/reports/${id}/`),
-    update: (id: number, data: any) => api.patch(`/evangelism/reports/${id}/update/`, data),
-    delete: (id: number) => api.delete(`/evangelism/reports/${id}/delete/`),
-    stats: (params?: any) => api.get('/evangelism/reports/stats/', { params }),
-  },
-  dashboard: () => api.get('/evangelism/dashboard/'),
-};
-
-// ============================================
-// UTILITY FUNCTIONS
-// ============================================
-export const setAuthTokens = (access: string, refresh?: string) => {
-  localStorage.setItem('access_token', access);
-  if (refresh) localStorage.setItem('refresh_token', refresh);
-};
-
-export const clearAuthTokens = () => {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user');
-};
-
-export const isAuthenticated = (): boolean => !!localStorage.getItem('access_token');
-
-export const getCurrentUser = (): User | null => {
-  try {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
-  } catch {
-    return null;
-  }
-};
-
-export const saveUser = (user: User) => localStorage.setItem('user', JSON.stringify(user));
-
-export const getAuthHeaders = () => {
-  const token = localStorage.getItem('access_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
-
-
-
-
-// ============================================
-// EXAM SUBMISSION API (Sermon-based exams)
-// ============================================
-export const examAPI = {
-  // Submissions
-  listSubmissions: (params?: ExamFilterParams) => 
-    api.get('/exam/submissions/', { params }),
-  
-  getSubmission: (id: number) => 
-    api.get(`/exam/submissions/${id}/`),
-  
-  gradeSubmission: (id: number, data: { 
-    answers: { questionId: string; score: number; feedback: string }[]; 
-    feedback?: string 
-  }) => api.post(`/exam/submissions/${id}/grade/`, data),
-  
-  getSubmissionStats: (sermonId: number) => 
-    api.get(`/exam/sermon/${sermonId}/submissions/stats/`),
-  
-  getExamAnalytics: (sermonId: number) => 
-    api.get(`/exam/sermon/${sermonId}/analytics/`),
-  
-  getStudentExams: (studentId: number) => 
-    api.get(`/exam/student/?studentId=${studentId}`),
-  
-  // ========== NEW: Submit exam to backend ==========
-  submitExam: (sermonId: number, data: { 
-    answers: { questionId: string; answer: string | string[]; maxScore: number }[];
-    timeTaken: number;
-  }) => api.post(`/exam/sermon/${sermonId}/submit/`, data),
-  
-  // ========== NEW: Check if user has submitted ==========
-  checkSubmission: (sermonId: number, studentId: number) => 
-    api.get(`/exam/sermon/${sermonId}/check/?studentId=${studentId}`),
-};
-
-// ============================================
-// DEFAULT EXPORT
-// ============================================
-export default {
-  api,
-  authAPI,
-  crudAPI,
-  studentsAPI,
-  examAPI,
-  evangelistsAPI,
-  groupsAPI,
-  certificatesAPI,
-  sermonsAPI,
-  commentsAPI,
-  evangelismAPI,
-  setAuthTokens,
-  clearAuthTokens,
-  isAuthenticated,
-  getCurrentUser,
-  saveUser,
-  getAuthHeaders,
-};,   AdminContext.tsx   // src/context/AdminContext.tsx
+}   and  AdminContext // src/context/AdminContext.tsx
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   studentsAPI, 
@@ -2361,19 +2553,31 @@ export const AdminProvider: React.FC<AdminProviderProps> = ({ children }) => {
       {children}
     </AdminContext.Provider>
   );
-};,    // src/pages/admin/GroupsManagement.tsx
-import React, { useState } from 'react';
+};  now  // src/pages/admin/StudentsManagement.tsx
+import React, { useState, useEffect } from 'react';
 import { 
-  FaSearch, FaPlus, FaEye, FaEdit, FaTrash, FaUsers, 
-  FaUserGraduate, FaChurch, FaFilter, FaArrowLeft, 
-  FaSpinner, FaTimesCircle, FaCheckCircle, FaSync,
-  FaUserTie, FaCalendar, FaUserPlus, FaUserMinus,
-  FaEnvelope, FaPhone, FaExclamationTriangle
+  FaSearch, 
+  FaPlus, 
+  FaEye, 
+  FaEdit, 
+  FaTrash, 
+  FaUserGraduate, 
+  FaEnvelope, 
+  FaPhone, 
+  FaArrowLeft, 
+  FaCheckCircle, 
+  FaTimesCircle, 
+  FaSpinner, 
+  FaFilter, 
+  FaSync,
+  FaTimes,
+  FaSave,
+  FaExclamationTriangle
 } from 'react-icons/fa';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../auth/context/AdminContext';
-import { groupsAPI } from '../../services/api';
-import type { Group, User } from '../../types/data';
+import { studentsAPI, groupsAPI } from '../../services/api';
+import type { Student, Group } from '../../types/data';
 import toast from 'react-hot-toast';
 
 // ============================================
@@ -2478,41 +2682,153 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 };
 
 // ============================================
-// VIEW GROUP MEMBERS MODAL
+// STUDENT MODAL (Add/Edit)
 // ============================================
-interface ViewMembersModalProps {
+interface StudentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  group: Group | null;
-  onRemoveMember: (groupId: number, userId: number, userName: string) => void;
+  onSuccess: () => void;
+  student?: Student | null;
+  groups: Group[];
+  users: any[];
 }
 
-const ViewMembersModal: React.FC<ViewMembersModalProps> = ({
+const StudentModal: React.FC<StudentModalProps> = ({
   isOpen,
   onClose,
-  group,
-  onRemoveMember
+  onSuccess,
+  student,
+  groups,
+  users,
 }) => {
-  if (!isOpen || !group) return null;
+  const isEdit = !!student;
+  const [formData, setFormData] = useState({
+    user_id: null as number | null,
+    assigned_evangelist: null as number | null,
+    groups: [] as number[],
+    exams_completed: 0,
+    certificates_earned: 0,
+    total_score: 0,
+    is_graduated: false,
+    graduation_date: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
- 
+  useEffect(() => {
+    if (isOpen && student) {
+      setFormData({
+        user_id: student.user?.id || null,
+        assigned_evangelist: student.assigned_evangelist || null,
+        groups: student.groups || [],
+        exams_completed: student.exams_completed || 0,
+        certificates_earned: student.certificates_earned || 0,
+        total_score: student.total_score || 0,
+        is_graduated: student.is_graduated || false,
+        graduation_date: student.graduation_date ? student.graduation_date.split('T')[0] : '',
+      });
+    } else if (isOpen) {
+      setFormData({
+        user_id: null,
+        assigned_evangelist: null,
+        groups: [],
+        exams_completed: 0,
+        certificates_earned: 0,
+        total_score: 0,
+        is_graduated: false,
+        graduation_date: '',
+      });
+    }
+  }, [isOpen, student]);
 
-  const getInitials = (name: string) => {
-    return name?.charAt(0).toUpperCase() || 'U';
+  if (!isOpen) return null;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : 
+              name === 'exams_completed' || name === 'certificates_earned' || name === 'total_score' ? 
+              parseFloat(value) || 0 : value,
+    }));
   };
+
+  const handleGroupToggle = (groupId: number) => {
+    setFormData(prev => ({
+      ...prev,
+      groups: prev.groups.includes(groupId)
+        ? prev.groups.filter(id => id !== groupId)
+        : [...prev.groups, groupId],
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.user_id) {
+      toast.error('Please select a user');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (isEdit && student) {
+        await studentsAPI.update(student.id, {
+          assigned_evangelist: formData.assigned_evangelist || undefined,
+          groups: formData.groups,
+          exams_completed: formData.exams_completed,
+          certificates_earned: formData.certificates_earned,
+          total_score: formData.total_score,
+          is_graduated: formData.is_graduated,
+          graduation_date: formData.graduation_date || undefined,
+        });
+        toast.success('Student updated successfully');
+      } else {
+        await studentsAPI.create({
+          user_id: formData.user_id,
+          assigned_evangelist: formData.assigned_evangelist || undefined,
+          groups: formData.groups,
+        });
+        toast.success('Student created successfully');
+      }
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Operation failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Debug: Log available users
+  console.log('Available users for student selection:', users);
+  console.log('Users with student role:', users.filter(u => u.role === 'student'));
+
+  // Show all users who can be students (any role except admin/super_admin)
+  // Or specifically filter for 'student' role
+  const availableUsers = users.filter(u => 
+    u.role === 'student' || 
+    u.role === 'evangelist' || 
+    u.role === 'user' ||
+    // If no role is set, include them as well
+    !u.role
+  );
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl overflow-hidden">
+      <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-cyan-50 to-blue-50">
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-cyan-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <FaUsers className="text-cyan-600 text-2xl" />
+              <FaUserGraduate className="text-green-600 text-2xl" />
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Group Members</h3>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {isEdit ? 'Edit Student' : 'Add New Student'}
+                </h3>
                 <p className="text-sm text-gray-600">
-                  {group.name} - {group.members?.length || 0} members
+                  {isEdit ? 'Update student details' : 'Create a new student record'}
                 </p>
               </div>
             </div>
@@ -2520,80 +2836,368 @@ const ViewMembersModal: React.FC<ViewMembersModalProps> = ({
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              <FaTimesCircle />
+              <FaTimes />
             </button>
           </div>
         </div>
 
-        {/* Members List */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-          {!group.members || group.members.length === 0 ? (
-            <div className="text-center py-12">
-              <FaUsers className="text-5xl text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">No members in this group</p>
-              <p className="text-sm text-gray-400">Add members using the "Add Member" button</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {group.members.map((member: User) => (
-                <div key={member.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200 hover:bg-white hover:shadow-md transition-all">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
-                      {getInitials(member.full_name || member.phone_number)}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">{member.full_name || 'Unknown'}</p>
-                      <p className="text-xs text-gray-500 flex items-center">
-                        <FaEnvelope className="mr-1" /> {member.email || 'No email'}
-                      </p>
-                      <p className="text-xs text-gray-500 flex items-center">
-                        <FaPhone className="mr-1" /> {member.phone_number || 'No phone'}
-                      </p>
-                      <p className="text-xs text-gray-400">Role: {member.role || 'User'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {member.is_online ? (
-                      <span className="text-xs text-green-600 flex items-center">
-                        <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-                        Online
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-400">Offline</span>
-                    )}
-                    <button
-                      onClick={() => onRemoveMember(group.id, member.id, member.full_name || member.phone_number)}
-                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Remove member"
-                    >
-                      <FaUserMinus />
-                    </button>
-                  </div>
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+          <div className="space-y-4">
+            {/* User Selection */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                User <span className="text-red-500">*</span>
+              </label>
+              
+              {users.length === 0 ? (
+                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200 text-center">
+                  <p className="text-sm text-yellow-700">No users available. Please refresh the page.</p>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="mt-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm transition-colors"
+                  >
+                    Refresh
+                  </button>
                 </div>
-              ))}
+              ) : (
+                <select
+                  name="user_id"
+                  value={formData.user_id || ''}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
+                  disabled={isEdit || isSubmitting}
+                  required
+                >
+                  <option value="">Select a user</option>
+                  {availableUsers.length === 0 ? (
+                    <option value="" disabled>No available users with student role</option>
+                  ) : (
+                    availableUsers.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.full_name || user.phone_number || 'Unknown'} ({user.email || 'No email'} - {user.phone_number || 'No phone'})
+                      </option>
+                    ))
+                  )}
+                </select>
+              )}
+              {isEdit && (
+                <p className="text-xs text-gray-500 mt-1">User cannot be changed after creation</p>
+              )}
+              {!isEdit && availableUsers.length === 0 && users.length > 0 && (
+                <p className="text-xs text-yellow-500 mt-1">
+                  No users with 'student' role found. Available users: {users.map(u => u.role).join(', ')}
+                </p>
+              )}
+            </div>
+
+            {/* Assigned Evangelist */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Assigned Evangelist
+              </label>
+              <select
+                name="assigned_evangelist"
+                value={formData.assigned_evangelist || ''}
+                onChange={handleChange}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
+                disabled={isSubmitting}
+              >
+                <option value="">None</option>
+                {users.filter(u => u.role === 'evangelist' || u.role === 'admin').map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.full_name || user.phone_number} ({user.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Groups */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Groups
+              </label>
+              <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-3 space-y-2">
+                {groups.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center">No groups available</p>
+                ) : (
+                  groups.map(group => (
+                    <label key={group.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={formData.groups.includes(group.id)}
+                        onChange={() => handleGroupToggle(group.id)}
+                        className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                        disabled={isSubmitting}
+                      />
+                      <span className="text-sm text-gray-700">{group.name}</span>
+                      <span className="text-xs text-gray-400">({group.type})</span>
+                      <span className="text-xs text-gray-400">- {group.member_count || 0} members</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Progress Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Exams Completed
+                </label>
+                <input
+                  type="number"
+                  name="exams_completed"
+                  value={formData.exams_completed}
+                  onChange={handleChange}
+                  min="0"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Certificates Earned
+                </label>
+                <input
+                  type="number"
+                  name="certificates_earned"
+                  value={formData.certificates_earned}
+                  onChange={handleChange}
+                  min="0"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Total Score
+                </label>
+                <input
+                  type="number"
+                  name="total_score"
+                  value={formData.total_score}
+                  onChange={handleChange}
+                  min="0"
+                  step="0.1"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+
+            {/* Graduation */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  name="is_graduated"
+                  checked={formData.is_graduated}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-cyan-600 border-gray-300 rounded focus:ring-cyan-500"
+                  disabled={isSubmitting}
+                />
+                <label className="text-sm font-medium text-gray-700">
+                  Graduated
+                </label>
+              </div>
+              {formData.is_graduated && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Graduation Date
+                  </label>
+                  <input
+                    type="date"
+                    name="graduation_date"
+                    value={formData.graduation_date}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="mt-6 pt-4 border-t border-gray-200 flex gap-3">
+            <button
+              type="submit"
+              disabled={isSubmitting || (users.length === 0)}
+              className="flex-1 flex justify-center items-center py-2.5 px-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <FaSpinner className="animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <FaSave className="mr-2" />
+                  {isEdit ? 'Update Student' : 'Create Student'}
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// VIEW STUDENT MODAL
+// ============================================
+interface ViewStudentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  student: Student | null;
+  groups: Group[];
+  users: any[];
+}
+
+const ViewStudentModal: React.FC<ViewStudentModalProps> = ({ isOpen, onClose, student, groups, users }) => {
+  if (!isOpen || !student) return null;
+
+  const formatDate = (date: string | null) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleDateString();
+  };
+
+  const getGroupNames = (groupIds: number[]) => {
+    return groupIds.map(id => {
+      const group = groups.find(g => g.id === id);
+      return group ? group.name : 'Unknown';
+    }).join(', ') || 'None';
+  };
+
+  const getEvangelistName = (id: number | null) => {
+    if (!id) return 'None';
+    const user = users.find(u => u.id === id);
+    return user?.full_name || 'Unknown';
+  };
+
+  const getStatus = () => {
+    if (student.is_graduated) return { label: 'Graduated', className: 'bg-blue-100 text-blue-700' };
+    if (student.exams_completed >= 20) return { label: 'Completed', className: 'bg-purple-100 text-purple-700' };
+    if (student.exams_completed > 0) return { label: 'Active', className: 'bg-green-100 text-green-700' };
+    return { label: 'Pending', className: 'bg-yellow-100 text-yellow-700' };
+  };
+
+  const status = getStatus();
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-cyan-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <FaUserGraduate className="text-green-600 text-2xl" />
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Student Details</h3>
+                <p className="text-sm text-gray-600">View complete student information</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <FaTimes />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)] space-y-6">
+          {/* Basic Info */}
+          <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-green-500 to-cyan-500 flex items-center justify-center text-white text-2xl font-bold">
+              {student.full_name?.charAt(0) || 'S'}
+            </div>
+            <div>
+              <p className="text-xl font-semibold text-gray-900">{student.full_name || 'Unknown'}</p>
+              <p className="text-sm text-gray-500 flex items-center">
+                <FaEnvelope className="mr-1" /> {student.email || 'No email'}
+              </p>
+              <p className="text-sm text-gray-500 flex items-center">
+                <FaPhone className="mr-1" /> {student.phone || 'No phone'}
+              </p>
+              <p className="text-sm text-gray-500">
+                ID: <span className="font-mono">{student.student_id}</span>
+              </p>
+              <p className="text-xs text-gray-400">Role: {student.user?.role || 'Student'}</p>
+            </div>
+          </div>
+
+          {/* Status & Progress */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 text-center bg-gray-50 rounded-xl border border-gray-200">
+              <p className={`text-xs font-medium uppercase tracking-wider ${status.className}`}>{status.label}</p>
+              <p className="text-lg font-semibold text-gray-900 mt-1">Status</p>
+            </div>
+            <div className="p-4 text-center bg-gray-50 rounded-xl border border-gray-200">
+              <p className="text-2xl font-bold text-cyan-600">{student.progress || 0}%</p>
+              <p className="text-xs text-gray-500">Progress</p>
+            </div>
+            <div className="p-4 text-center bg-gray-50 rounded-xl border border-gray-200">
+              <p className="text-2xl font-bold text-green-600">{student.exams_completed || 0}</p>
+              <p className="text-xs text-gray-500">Exams</p>
+            </div>
+            <div className="p-4 text-center bg-gray-50 rounded-xl border border-gray-200">
+              <p className="text-2xl font-bold text-yellow-600">{student.certificates_earned || 0}</p>
+              <p className="text-xs text-gray-500">Certificates</p>
+            </div>
+          </div>
+
+          {/* Groups & Evangelist */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 bg-purple-50 rounded-xl border border-purple-200">
+              <p className="text-xs text-purple-600 font-medium uppercase tracking-wider">Groups</p>
+              <p className="text-sm font-medium text-gray-900">{getGroupNames(student.groups || [])}</p>
+              <p className="text-xs text-gray-500">{student.groups?.length || 0} groups</p>
+            </div>
+            <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+              <p className="text-xs text-indigo-600 font-medium uppercase tracking-wider">Assigned Evangelist</p>
+              <p className="text-sm font-medium text-gray-900">{getEvangelistName(student.assigned_evangelist)}</p>
+            </div>
+          </div>
+
+          {/* Additional Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-gray-500">Enrollment Date</p>
+              <p className="font-medium text-gray-900">{formatDate(student.enrollment_date)}</p>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-gray-500">Total Score</p>
+              <p className="font-medium text-gray-900">{student.total_score || 0}</p>
+            </div>
+          </div>
+
+          {/* Graduation Info */}
+          {student.is_graduated && (
+            <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+              <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">Graduation</p>
+              <p className="text-sm font-medium text-gray-900">
+                Graduated on {formatDate(student.graduation_date)}
+              </p>
             </div>
           )}
 
-          {/* Member Stats */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-2xl font-bold text-cyan-600">{group.members?.length || 0}</p>
-                <p className="text-xs text-gray-500">Total Members</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-green-600">
-                  {group.members?.filter(m => m.is_online).length || 0}
-                </p>
-                <p className="text-xs text-gray-500">Online</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-blue-600">
-                  {group.members?.filter(m => m.is_verified).length || 0}
-                </p>
-                <p className="text-xs text-gray-500">Verified</p>
-              </div>
-            </div>
+          {/* Timestamps */}
+          <div className="text-xs text-gray-400 border-t border-gray-100 pt-4">
+            <p>Created: {formatDate(student.created_at)}</p>
+            <p>Updated: {formatDate(student.updated_at)}</p>
           </div>
         </div>
 
@@ -2614,33 +3218,39 @@ const ViewMembersModal: React.FC<ViewMembersModalProps> = ({
 // ============================================
 // MAIN COMPONENT
 // ============================================
-const GroupsManagement: React.FC = () => {
+const StudentsManagement: React.FC = () => {
   const navigate = useNavigate();
   const { 
-    groups, 
-    loadingGroups, 
-    groupError,
-    refreshAllGroups,
-    deleteGroup,
-    addGroupMember,
-    removeGroupMember,
-    students,
-    refreshAllStudents
+    students, 
+    loadingStudents, 
+    studentError,
+    refreshAllStudents, 
+    deleteStudent,
+    bulkDeleteStudents,
+    filterStudents,
+    getStudentStatsSummary,
+    getStudentStatusBadge,
+    users,
+    refreshUsers,
+    loadingUsers
   } = useAdmin();
   
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [filterType, setFilterType] = useState<'all' | 'evangelist' | 'student' | 'mixed'>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
-  const [selectedGroups] = useState<number[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'pending' | 'graduated' | 'completed'>('all');
+  const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  
-  // ========== VIEW MEMBERS MODAL STATE ==========
-  const [showViewMembersModal, setShowViewMembersModal] = useState(false);
-  const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<Group | null>(null);
-  
-  // ========== CONFIRMATION MODAL STATE ==========
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+
+  // Modal States
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Confirmation Modal State
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
     title: '',
@@ -2650,66 +3260,48 @@ const GroupsManagement: React.FC = () => {
     onConfirm: () => {},
   });
 
-  // ========== ADD MEMBER STATE ==========
-  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
-  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
-  const [selectedGroupName, setSelectedGroupName] = useState<string>('');
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [selectedStudentName, setSelectedStudentName] = useState<string>('');
-  const [isAddingMember, setIsAddingMember] = useState(false);
-  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  // Fetch groups
+  useEffect(() => {
+    const fetchGroups = async () => {
+      setLoadingGroups(true);
+      try {
+        const response = await groupsAPI.list();
+        setGroups(response.data);
+      } catch (error) {
+        console.error('Error fetching groups:', error);
+      } finally {
+        setLoadingGroups(false);
+      }
+    };
+    fetchGroups();
+  }, []);
 
-  // Filter groups
-  const filteredGroups = groups.filter(group => {
-    const matchesSearch = 
-      group.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      group.leader_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      group.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesType = filterType === 'all' || group.type === filterType;
-    const matchesStatus = filterStatus === 'all' || 
-      (filterStatus === 'active' && group.is_active) ||
-      (filterStatus === 'inactive' && !group.is_active);
-    
-    return matchesSearch && matchesType && matchesStatus;
-  });
-
-  // Filter students for member selection
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = 
-      student.full_name?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-      student.email?.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-      student.phone?.includes(memberSearchQuery) ||
-      student.student_id?.toLowerCase().includes(memberSearchQuery.toLowerCase());
-    return matchesSearch;
-  });
-
-  // Stats
-  const stats = {
-    total: groups.length,
-    evangelist: groups.filter(g => g.type === 'evangelist').length,
-    student: groups.filter(g => g.type === 'student').length,
-    mixed: groups.filter(g => g.type === 'mixed').length,
-    active: groups.filter(g => g.is_active).length,
-    inactive: groups.filter(g => !g.is_active).length,
+  // Filtered students
+  const filteredStudents = filterStudents ? filterStudents(searchQuery, filterStatus) : [];
+  const statsSummary = getStudentStatsSummary ? getStudentStatsSummary() : {
+    total: 0,
+    active: 0,
+    pending: 0,
+    graduated: 0,
+    averageProgress: 0
   };
 
   // ========== HANDLERS ==========
   const handleDelete = (id: number, name: string) => {
     setConfirmationModal({
       isOpen: true,
-      title: 'Delete Group',
-      message: `Are you sure you want to delete the group "${name}"? This action cannot be undone.`,
-      confirmText: 'Delete Group',
+      title: 'Delete Student',
+      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      confirmText: 'Delete Student',
       type: 'danger',
       onConfirm: async () => {
         setIsDeleting(true);
         try {
-          await deleteGroup(id);
-          toast.success(`Group "${name}" deleted successfully`);
-          refreshAllGroups();
+          await deleteStudent(id);
+          toast.success(`Student "${name}" deleted successfully`);
+          refreshAllStudents();
         } catch (error: any) {
-          toast.error(error.response?.data?.error || 'Failed to delete group');
+          toast.error(error.response?.data?.error || 'Failed to delete student');
         } finally {
           setIsDeleting(false);
           setConfirmationModal(prev => ({ ...prev, isOpen: false }));
@@ -2719,27 +3311,26 @@ const GroupsManagement: React.FC = () => {
   };
 
   const handleBulkDelete = () => {
-    if (selectedGroups.length === 0) {
-      toast.error('Please select at least one group');
+    if (selectedStudents.length === 0) {
+      toast.error('Please select at least one student');
       return;
     }
     
     setConfirmationModal({
       isOpen: true,
-      title: 'Bulk Delete Groups',
-      message: `Are you sure you want to delete ${selectedGroups.length} group(s)? This action cannot be undone.`,
-      confirmText: `Delete ${selectedGroups.length} Groups`,
+      title: 'Bulk Delete Students',
+      message: `Are you sure you want to delete ${selectedStudents.length} student(s)? This action cannot be undone.`,
+      confirmText: `Delete ${selectedStudents.length} Students`,
       type: 'danger',
       onConfirm: async () => {
         setIsBulkDeleting(true);
         try {
-          for (const id of selectedGroups) {
-            await deleteGroup(id);
-          }
-          toast.success(`${selectedGroups.length} group(s) deleted successfully`);
-          refreshAllGroups();
+          await bulkDeleteStudents(selectedStudents);
+          toast.success(`${selectedStudents.length} student(s) deleted successfully`);
+          setSelectedStudents([]);
+          refreshAllStudents();
         } catch (error: any) {
-          toast.error(error.response?.data?.error || 'Failed to delete groups');
+          toast.error(error.response?.data?.error || 'Failed to delete students');
         } finally {
           setIsBulkDeleting(false);
           setConfirmationModal(prev => ({ ...prev, isOpen: false }));
@@ -2748,175 +3339,78 @@ const GroupsManagement: React.FC = () => {
     });
   };
 
-  const handleRefresh = () => {
-    refreshAllGroups();
-    if (refreshAllStudents) {
-      refreshAllStudents();
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedStudents(filteredStudents.map((s: Student) => s.id));
+    } else {
+      setSelectedStudents([]);
     }
+  };
+
+  const handleSelectStudent = (id: number, checked: boolean) => {
+    if (checked) {
+      setSelectedStudents(prev => [...prev, id]);
+    } else {
+      setSelectedStudents(prev => prev.filter(sid => sid !== id));
+    }
+  };
+
+  const handleRefresh = () => {
+    refreshAllStudents();
+    refreshUsers();
     toast.success('Refreshed!');
   };
 
-  const handleViewMembers = (group: Group) => {
-    setSelectedGroupForMembers(group);
-    setShowViewMembersModal(true);
+  const handleOpenView = (student: Student) => {
+    setSelectedStudent(student);
+    setShowViewModal(true);
   };
 
-  // ========== ADD MEMBER HANDLERS ==========
-  const handleOpenAddMemberModal = (groupId: number, groupName: string) => {
-    setSelectedGroupId(groupId);
-    setSelectedGroupName(groupName);
-    setSelectedUserId(null);
-    setSelectedStudentName('');
-    setMemberSearchQuery('');
-    setShowAddMemberModal(true);
+  const handleOpenEdit = (student: Student) => {
+    setSelectedStudent(student);
+    setShowEditModal(true);
   };
 
-  const handleCloseAddMemberModal = () => {
-    setShowAddMemberModal(false);
-    setSelectedGroupId(null);
-    setSelectedGroupName('');
-    setSelectedUserId(null);
-    setSelectedStudentName('');
-    setMemberSearchQuery('');
-  };
-
-  const handleSelectStudent = (studentId: number, studentName: string) => {
-    setSelectedUserId(studentId);
-    setSelectedStudentName(studentName);
-  };
-
-  // This function opens the confirmation modal
-  const handleAddMemberClick = () => {
-    if (!selectedUserId) {
-      toast.error('Please select a student to add');
-      return;
-    }
-
-    // Open confirmation modal
-    setConfirmationModal({
-      isOpen: true,
-      title: 'Add Member to Group',
-      message: `Are you sure you want to add "${selectedStudentName}" to "${selectedGroupName}"?`,
-      confirmText: 'Add Member',
-      type: 'success',
-      onConfirm: handleConfirmAddMember
-    });
-  };
-
-  // This function executes the actual add member operation
-  const handleConfirmAddMember = async () => {
-    if (!selectedGroupId || !selectedUserId) {
-      toast.error('Missing group or student information');
-      setConfirmationModal(prev => ({ ...prev, isOpen: false }));
-      return;
-    }
-
-    setIsAddingMember(true);
-    try {
-      await addGroupMember(selectedGroupId, selectedUserId);
-      toast.success(`${selectedStudentName} added to group successfully`);
-      
-      // Close both modals
-      setConfirmationModal(prev => ({ ...prev, isOpen: false }));
-      handleCloseAddMemberModal();
-      
-      // Refresh data
-      refreshAllGroups();
-      
-      // Refresh the group to show updated members
-      const updatedGroup = await groupsAPI.get(selectedGroupId);
-      setSelectedGroupForMembers(updatedGroup.data);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to add member');
-      setConfirmationModal(prev => ({ ...prev, isOpen: false }));
-    } finally {
-      setIsAddingMember(false);
-    }
-  };
-
-  const handleRemoveMember = (groupId: number, userId: number, userName: string) => {
-    setConfirmationModal({
-      isOpen: true,
-      title: 'Remove Member',
-      message: `Are you sure you want to remove "${userName}" from this group?`,
-      confirmText: 'Remove Member',
-      type: 'warning',
-      onConfirm: async () => {
-        try {
-          await removeGroupMember(groupId, userId);
-          toast.success(`${userName} removed from group`);
-          refreshAllGroups();
-          // Refresh the group to show updated members
-          const updatedGroup = await groupsAPI.get(groupId);
-          setSelectedGroupForMembers(updatedGroup.data);
-        } catch (error: any) {
-          toast.error(error.response?.data?.error || 'Failed to remove member');
-        } finally {
-          setConfirmationModal(prev => ({ ...prev, isOpen: false }));
-        }
-      }
-    });
+  const handleModalSuccess = () => {
+    refreshAllStudents();
+    refreshUsers();
   };
 
   // ========== HELPERS ==========
-  const getTypeIcon = (type: string) => {
-    switch(type) {
-      case 'evangelist':
-        return <FaChurch className="text-cyan-600" />;
-      case 'student':
-        return <FaUserGraduate className="text-cyan-600" />;
-      case 'mixed':
-        return <FaUsers className="text-cyan-600" />;
-      default:
-        return <FaUsers className="text-cyan-600" />;
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch(type) {
-      case 'evangelist':
-        return 'Evangelist';
-      case 'student':
-        return 'Student';
-      case 'mixed':
-        return 'Mixed';
-      default:
-        return type;
-    }
-  };
-
-  const getStatusBadge = (group: Group) => {
-    if (group.is_active) {
-      return { label: 'Active', className: 'bg-green-100 text-green-700', icon: <FaCheckCircle className="mr-1" /> };
-    }
-    return { label: 'Inactive', className: 'bg-red-100 text-red-700', icon: <FaTimesCircle className="mr-1" /> };
-  };
-
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString();
+  const getRoleBadge = (role: string) => {
+    const roleMap: Record<string, { label: string; className: string }> = {
+      evangelist: { label: 'Evangelist', className: 'bg-blue-100 text-blue-700' },
+      pastor: { label: 'Pastor', className: 'bg-purple-100 text-purple-700' },
+      church_admin: { label: 'Church Admin', className: 'bg-indigo-100 text-indigo-700' },
+      super_admin: { label: 'Super Admin', className: 'bg-red-100 text-red-700' },
+      admin: { label: 'Admin', className: 'bg-cyan-100 text-cyan-700' },
+      student: { label: 'Student', className: 'bg-green-100 text-green-700' },
+      user: { label: 'User', className: 'bg-gray-100 text-gray-700' },
+    };
+    return roleMap[role] || { label: role || 'User', className: 'bg-gray-100 text-gray-700' };
   };
 
   // ========== RENDER ==========
-  if (loadingGroups && groups.length === 0) {
+  if (loadingStudents && students.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <FaSpinner className="animate-spin text-4xl text-cyan-500 mx-auto mb-4" />
-          <p className="text-gray-500">Loading groups...</p>
+          <p className="text-gray-500">Loading students...</p>
         </div>
       </div>
     );
   }
 
-  if (groupError && groups.length === 0) {
+  if (studentError && students.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <FaTimesCircle className="text-4xl text-red-500" />
           </div>
-          <p className="text-gray-700 font-medium">Failed to load groups</p>
-          <p className="text-sm text-gray-400 mt-1">{groupError}</p>
+          <p className="text-gray-700 font-medium">Failed to load students</p>
+          <p className="text-sm text-gray-400 mt-1">{studentError}</p>
           <button
             onClick={handleRefresh}
             className="mt-4 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors flex items-center mx-auto"
@@ -2940,18 +3434,41 @@ const GroupsManagement: React.FC = () => {
         message={confirmationModal.message}
         confirmText={confirmationModal.confirmText}
         type={confirmationModal.type}
-        isLoading={isDeleting || isBulkDeleting || isAddingMember}
+        isLoading={isDeleting || isBulkDeleting}
       />
 
-      {/* View Members Modal */}
-      <ViewMembersModal
-        isOpen={showViewMembersModal}
+      {/* Add Modal */}
+      <StudentModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={handleModalSuccess}
+        groups={groups}
+        users={users}
+      />
+
+      {/* Edit Modal */}
+      <StudentModal
+        isOpen={showEditModal}
         onClose={() => {
-          setShowViewMembersModal(false);
-          setSelectedGroupForMembers(null);
+          setShowEditModal(false);
+          setSelectedStudent(null);
         }}
-        group={selectedGroupForMembers}
-        onRemoveMember={handleRemoveMember}
+        onSuccess={handleModalSuccess}
+        student={selectedStudent}
+        groups={groups}
+        users={users}
+      />
+
+      {/* View Modal */}
+      <ViewStudentModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false);
+          setSelectedStudent(null);
+        }}
+        student={selectedStudent}
+        groups={groups}
+        users={users}
       />
 
       {/* Header */}
@@ -2965,9 +3482,9 @@ const GroupsManagement: React.FC = () => {
             <FaArrowLeft className="text-gray-500 group-hover:text-cyan-600 transition-colors" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Groups Management</h2>
-            <p className="text-sm text-gray-600">Manage all evangelist and student groups</p>
-            <p className="text-xs text-gray-400 mt-1">{groups.length} groups found</p>
+            <h2 className="text-2xl font-bold text-gray-900">Students Management</h2>
+            <p className="text-sm text-gray-600">Manage all students in the system</p>
+            <p className="text-xs text-gray-400 mt-1">{students.length} students found</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
@@ -2975,44 +3492,40 @@ const GroupsManagement: React.FC = () => {
             onClick={handleRefresh}
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center space-x-2"
           >
-            <FaSync className={loadingGroups ? 'animate-spin' : ''} />
+            <FaSync className={loadingStudents ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </button>
-          <Link 
-            to="/admin/create-group" 
+          <button
+            onClick={() => setShowAddModal(true)}
             className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
           >
             <FaPlus />
-            <span>Create Group</span>
-          </Link>
+            <span>Add Student</span>
+          </button>
         </div>
       </div>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-cyan-500">
-          <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-          <p className="text-xs text-gray-500">Total Groups</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-blue-500">
-          <p className="text-2xl font-bold text-blue-600">{stats.evangelist}</p>
-          <p className="text-xs text-gray-500">Evangelist</p>
+          <p className="text-2xl font-bold text-gray-900">{statsSummary.total}</p>
+          <p className="text-xs text-gray-500">Total Students</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-green-500">
-          <p className="text-2xl font-bold text-green-600">{stats.student}</p>
-          <p className="text-xs text-gray-500">Student</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-purple-500">
-          <p className="text-2xl font-bold text-purple-600">{stats.mixed}</p>
-          <p className="text-xs text-gray-500">Mixed</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-green-500">
-          <p className="text-2xl font-bold text-green-600">{stats.active}</p>
+          <p className="text-2xl font-bold text-green-600">{statsSummary.active}</p>
           <p className="text-xs text-gray-500">Active</p>
         </div>
-        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-red-500">
-          <p className="text-2xl font-bold text-red-600">{stats.inactive}</p>
-          <p className="text-xs text-gray-500">Inactive</p>
+        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-yellow-500">
+          <p className="text-2xl font-bold text-yellow-600">{statsSummary.pending}</p>
+          <p className="text-xs text-gray-500">Pending</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-blue-500">
+          <p className="text-2xl font-bold text-blue-600">{statsSummary.graduated}</p>
+          <p className="text-xs text-gray-500">Graduated</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-purple-500">
+          <p className="text-2xl font-bold text-purple-600">{statsSummary.averageProgress}%</p>
+          <p className="text-xs text-gray-500">Avg Progress</p>
         </div>
       </div>
 
@@ -3023,10 +3536,10 @@ const GroupsManagement: React.FC = () => {
             <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search groups by name, leader or description..."
+              placeholder="Search students by name, email, phone or ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
           <div className="flex gap-2">
@@ -3039,14 +3552,14 @@ const GroupsManagement: React.FC = () => {
               <FaFilter />
               <span>Filters</span>
             </button>
-            {selectedGroups.length > 0 && (
+            {selectedStudents.length > 0 && (
               <button
                 onClick={handleBulkDelete}
                 disabled={isBulkDeleting}
                 className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-all flex items-center space-x-2 disabled:opacity-50"
               >
                 {isBulkDeleting ? <FaSpinner className="animate-spin" /> : <FaTrash />}
-                <span>Delete ({selectedGroups.length})</span>
+                <span>Delete ({selectedStudents.length})</span>
               </button>
             )}
           </div>
@@ -3057,19 +3570,6 @@ const GroupsManagement: React.FC = () => {
           <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                >
-                  <option value="all">All Types</option>
-                  <option value="evangelist">Evangelist</option>
-                  <option value="student">Student</option>
-                  <option value="mixed">Mixed</option>
-                </select>
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
                   value={filterStatus}
@@ -3078,14 +3578,15 @@ const GroupsManagement: React.FC = () => {
                 >
                   <option value="all">All</option>
                   <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="pending">Pending</option>
+                  <option value="graduated">Graduated</option>
+                  <option value="completed">Completed</option>
                 </select>
               </div>
             </div>
             <div className="mt-3 flex justify-end">
               <button
                 onClick={() => {
-                  setFilterType('all');
                   setFilterStatus('all');
                   setSearchQuery('');
                 }}
@@ -3098,258 +3599,187 @@ const GroupsManagement: React.FC = () => {
         )}
       </div>
 
-      {/* Groups Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredGroups.map((group) => {
-          const status = getStatusBadge(group);
-          return (
-            <div key={group.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-6 border-l-4 border-cyan-500">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    {getTypeIcon(group.type)}
-                    <h4 className="text-lg font-semibold text-gray-900">{group.name}</h4>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">{group.description || 'No description'}</p>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm">
-                    <span className="flex items-center text-gray-600">
-                      <FaUsers className="mr-1 text-cyan-500" />
-                      {group.member_count || 0} members
-                    </span>
-                    <span className="text-gray-300">•</span>
-                    <span className="text-gray-600 flex items-center">
-                      <FaUserTie className="mr-1 text-cyan-500" />
-                      Leader: <span className="font-medium text-gray-800 ml-1">{group.leader_name || 'N/A'}</span>
-                    </span>
-                    <span className="text-gray-300">•</span>
-                    <span className="text-gray-600 flex items-center">
-                      <FaCalendar className="mr-1 text-gray-400" />
-                      {formatDate(group.created_at)}
-                    </span>
-                  </div>
-                  
-                  {/* Member Count Badge */}
-                  <div className="mt-2 flex items-center space-x-2">
-                    <span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">
-                      {group.member_count || 0} members
-                    </span>
-                    {group.members && group.members.length > 0 && (
-                      <span className="text-xs text-gray-500">
-                        {group.members.filter(m => m.is_online).length} online
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Members Preview */}
-                  {group.members && group.members.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {group.members.slice(0, 5).map((member) => (
-                        <div key={member.id} className="flex items-center">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium text-white ${
-                            member.is_online ? 'bg-green-500' : 'bg-gray-400'
-                          }`}>
-                            {member.full_name?.charAt(0).toUpperCase() || 'U'}
-                          </div>
-                          {member.is_online && (
-                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full ml-0.5"></span>
-                          )}
+      {/* Students Table */}
+      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                  />
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exams</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredStudents.map((student: Student) => {
+                const status = getStudentStatusBadge ? getStudentStatusBadge(student) : { 
+                  label: 'Unknown', 
+                  className: 'bg-gray-100 text-gray-700', 
+                  icon: null 
+                };
+                const role = getRoleBadge(student.user?.role || 'student');
+                return (
+                  <tr key={student.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.includes(student.id)}
+                        onChange={(e) => handleSelectStudent(student.id, e.target.checked)}
+                        className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-cyan-50 rounded-full flex-shrink-0">
+                          <FaUserGraduate className="text-cyan-600" />
                         </div>
-                      ))}
-                      {group.members.length > 5 && (
-                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
-                          +{group.members.length - 5}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <span className={`px-2.5 py-1 text-xs font-medium rounded-full inline-flex items-center ${status.className}`}>
-                  {status.icon}
-                  {status.label}
-                </span>
-              </div>
-              <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-100">
-                <span className="text-xs text-gray-500 capitalize">
-                  Type: <span className="font-medium">{getTypeLabel(group.type)}</span>
-                </span>
-                <div className="flex space-x-1">
-                  <button
-                    onClick={() => handleViewMembers(group)}
-                    className="p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
-                    title="View Members"
-                  >
-                    <FaUsers />
-                  </button>
-                  <button
-                    onClick={() => handleOpenAddMemberModal(group.id, group.name)}
-                    className="p-2 text-gray-500 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50"
-                    title="Add Member"
-                  >
-                    <FaUserPlus />
-                  </button>
-                  <Link 
-                    to={`/admin/groups/${group.id}`} 
-                    className="p-2 text-gray-500 hover:text-cyan-600 transition-colors rounded-lg hover:bg-cyan-50"
-                    title="View Group"
-                  >
-                    <FaEye />
-                  </Link>
-                  <Link 
-                    to={`/admin/groups/edit/${group.id}`} 
-                    className="p-2 text-gray-500 hover:text-cyan-600 transition-colors rounded-lg hover:bg-cyan-50"
-                    title="Edit Group"
-                  >
-                    <FaEdit />
-                  </Link>
-                  <button 
-                    onClick={() => handleDelete(group.id, group.name)} 
-                    disabled={isDeleting}
-                    className="p-2 text-gray-500 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 disabled:opacity-50"
-                    title="Delete Group"
-                  >
-                    <FaTrash />
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Empty State */}
-      {filteredGroups.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl shadow-md">
-          <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaUsers className="text-4xl text-cyan-400" />
-          </div>
-          <p className="text-gray-500 font-medium">No groups found</p>
-          <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filter</p>
-          <Link 
-            to="/admin/create-group" 
-            className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium"
-          >
-            <FaPlus className="mr-2" />
-            Create your first group
-          </Link>
-        </div>
-      )}
-
-      {/* Add Member Modal */}
-      {showAddMemberModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900">Add Member to Group</h3>
-                <button
-                  onClick={handleCloseAddMemberModal}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <FaTimesCircle />
-                </button>
-              </div>
-              <p className="text-sm text-gray-600 mt-1">Add a student to <strong>{selectedGroupName}</strong></p>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {/* Search Students */}
-              <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search students by name, email or ID..."
-                  value={memberSearchQuery}
-                  onChange={(e) => setMemberSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Students List */}
-              <div className="max-h-60 overflow-y-auto space-y-2">
-                {filteredStudents.length === 0 ? (
-                  <p className="text-center text-gray-500 py-4">No students found</p>
-                ) : (
-                  filteredStudents.map((student) => (
-                    <div
-                      key={student.id}
-                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedUserId === student.id
-                          ? 'border-cyan-500 bg-cyan-50'
-                          : 'border-gray-200 hover:border-cyan-300 hover:bg-gray-50'
-                      }`}
-                      onClick={() => handleSelectStudent(student.id, student.full_name)}
-                    >
-                      <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium text-gray-900">{student.full_name}</p>
+                          <p className="text-sm font-medium text-gray-900">{student.full_name || 'Unknown'}</p>
                           <p className="text-xs text-gray-500 flex items-center">
-                            <FaEnvelope className="mr-1" /> {student.email}
+                            <FaEnvelope className="mr-1 text-gray-400 flex-shrink-0" />
+                            <span className="truncate">{student.email || 'No email'}</span>
                           </p>
                           <p className="text-xs text-gray-500 flex items-center">
-                            <FaPhone className="mr-1" /> {student.phone}
+                            <FaPhone className="mr-1 text-gray-400 flex-shrink-0" />
+                            <span>{student.phone || 'No phone'}</span>
                           </p>
-                          <p className="text-xs text-gray-400">ID: {student.student_id}</p>
+                          <p className="text-xs text-gray-400">
+                            Role: <span className={`px-1 py-0.5 text-xs rounded ${role.className}`}>{role.label}</span>
+                          </p>
                         </div>
-                        {selectedUserId === student.id && (
-                          <FaCheckCircle className="text-cyan-500 text-xl" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm font-mono text-gray-600">{student.student_id}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col items-start gap-1">
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 max-w-[120px]">
+                          <div 
+                            className="bg-cyan-600 h-2.5 rounded-full transition-all duration-300"
+                            style={{ width: `${student.progress || 0}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500">{student.progress || 0}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-gray-700">{student.exams_completed || 0} exams</span>
+                        <span className="text-xs text-gray-500">{student.certificates_earned || 0} certificates</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full inline-flex items-center ${status.className}`}>
+                          {status.icon}
+                          {status.label}
+                        </span>
+                        {student.user?.is_online && (
+                          <span className="text-xs text-green-600 flex items-center">
+                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
+                            Online
+                          </span>
                         )}
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
-              <button
-                onClick={handleCloseAddMemberModal}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddMemberClick}
-                disabled={!selectedUserId || isAddingMember}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
-              >
-                <FaUserPlus className="mr-2" />
-                Add Member
-              </button>
-            </div>
-          </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          onClick={() => handleOpenView(student)}
+                          className="p-2 text-gray-500 hover:text-cyan-600 transition-colors rounded-lg hover:bg-cyan-50"
+                          title="View Student"
+                        >
+                          <FaEye />
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(student)}
+                          className="p-2 text-gray-500 hover:text-cyan-600 transition-colors rounded-lg hover:bg-cyan-50"
+                          title="Edit Student"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(student.id, student.full_name || 'Unknown')}
+                          disabled={isDeleting}
+                          className="p-2 text-gray-500 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 disabled:opacity-50"
+                          title="Delete Student"
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
 
-      {/* Footer Info */}
-      {filteredGroups.length > 0 && (
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500 bg-white rounded-xl shadow-md px-6 py-3">
-          <span>Showing {filteredGroups.length} of {groups.length} groups</span>
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="flex items-center">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
-              Evangelist: {stats.evangelist}
-            </span>
-            <span className="flex items-center">
-              <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-              Student: {stats.student}
-            </span>
-            <span className="flex items-center">
-              <span className="w-2 h-2 bg-purple-500 rounded-full mr-1"></span>
-              Mixed: {stats.mixed}
-            </span>
-            <span className="flex items-center">
-              <span className="w-2 h-2 bg-green-600 rounded-full mr-1"></span>
-              Active: {stats.active}
-            </span>
-            <span className="flex items-center">
-              <span className="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
-              Inactive: {stats.inactive}
-            </span>
+        {/* Empty State */}
+        {filteredStudents.length === 0 && (
+          <div className="text-center py-16">
+            <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FaUserGraduate className="text-4xl text-cyan-400" />
+            </div>
+            <p className="text-gray-500 font-medium">No students found</p>
+            <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filter</p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium"
+            >
+              <FaPlus className="mr-2" />
+              Add your first student
+            </button>
           </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500 bg-white rounded-xl shadow-md px-6 py-3">
+        <span>Showing {filteredStudents.length} of {students.length} students</span>
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="flex items-center">
+            <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+            Active: {statsSummary.active}
+          </span>
+          <span className="flex items-center">
+            <span className="w-2 h-2 bg-yellow-500 rounded-full mr-1"></span>
+            Pending: {statsSummary.pending}
+          </span>
+          <span className="flex items-center">
+            <span className="w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
+            Graduated: {statsSummary.graduated}
+          </span>
+          <span className="flex items-center">
+            <span className="w-2 h-2 bg-purple-500 rounded-full mr-1"></span>
+            Avg Progress: {statsSummary.averageProgress}%
+          </span>
         </div>
-      )}
+      </div>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
 
-export default GroupsManagement;,     why  it   does  not   add  more  than  one  member?  in  oe  grpoup?  solve  the problem  by   determinig  the  problem  first  then solving
+export default StudentsManagement;    what  is  an  error   then  solve the  problem

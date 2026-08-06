@@ -1,3 +1,4 @@
+// src/pages/admin/UserManagement.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FaUsers, 
@@ -10,23 +11,13 @@ import {
   FaEye,
   FaEdit,
   FaTrash,
-  FaEnvelope,
-  FaPhone,
   FaSpinner,
-  FaFilter,
   FaSync,
   FaTimes,
   FaSave,
-  FaUser,
-  FaMapMarkerAlt,
-  FaInfoCircle,
   FaCheckCircle,
   FaTimesCircle,
-  FaUserCheck,
-  FaUserClock,
   FaDatabase,
-  FaArrowLeft,
-  FaArrowRight,
   FaChartBar,
   FaImage,
   FaUpload
@@ -50,7 +41,7 @@ import type {
 } from '../../types/userData';
 
 // ============================================
-// IMAGE HANDLER COMPONENT
+// PROFILE IMAGE COMPONENT
 // ============================================
 const ProfileImage: React.FC<{ 
   base64Image: string | null; 
@@ -78,11 +69,6 @@ const ProfileImage: React.FC<{
 
   if (base64Image && !imageError) {
     try {
-      // Check if it's a valid base64 image
-      const isValidBase64 = base64Image.startsWith('data:image') || 
-                           base64Image.startsWith('/9j/') || 
-                           base64Image.startsWith('iVBOR');
-      
       const imageSrc = base64Image.startsWith('data:image') 
         ? base64Image 
         : `data:image/jpeg;base64,${base64Image}`;
@@ -96,11 +82,7 @@ const ProfileImage: React.FC<{
         />
       );
     } catch (error) {
-      return (
-        <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 flex items-center justify-center text-white font-bold text-sm`}>
-          {getInitials()}
-        </div>
-      );
+      // Fall through to default
     }
   }
 
@@ -126,13 +108,11 @@ const ImageUpload: React.FC<{
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image size must be less than 5MB');
       return;
@@ -237,9 +217,7 @@ const AdminPanel: React.FC = () => {
   const [actionFilter, setActionFilter] = useState('');
   
   // Selection states
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -275,9 +253,11 @@ const AdminPanel: React.FC = () => {
     setLoading(prev => ({ ...prev, users: true }));
     try {
       const data = await userApi.getUsers();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      toast.error('Failed to fetch users');
+      console.error('Error fetching users:', error);
+      toast.error(error?.message || 'Failed to fetch users');
+      setUsers([]);
     } finally {
       setLoading(prev => ({ ...prev, users: false }));
     }
@@ -287,9 +267,11 @@ const AdminPanel: React.FC = () => {
     setLoading(prev => ({ ...prev, profiles: true }));
     try {
       const data = await profileApi.getProfiles();
-      setProfiles(data);
+      setProfiles(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      toast.error('Failed to fetch profiles');
+      console.error('Error fetching profiles:', error);
+      toast.error(error?.message || 'Failed to fetch profiles');
+      setProfiles([]);
     } finally {
       setLoading(prev => ({ ...prev, profiles: false }));
     }
@@ -299,9 +281,11 @@ const AdminPanel: React.FC = () => {
     setLoading(prev => ({ ...prev, verifications: true }));
     try {
       const data = await verificationApi.getVerifications();
-      setVerifications(data);
+      setVerifications(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      toast.error('Failed to fetch verifications');
+      console.error('Error fetching verifications:', error);
+      toast.error(error?.message || 'Failed to fetch verifications');
+      setVerifications([]);
     } finally {
       setLoading(prev => ({ ...prev, verifications: false }));
     }
@@ -311,9 +295,11 @@ const AdminPanel: React.FC = () => {
     setLoading(prev => ({ ...prev, sessions: true }));
     try {
       const data = await sessionApi.getSessions();
-      setSessions(data);
+      setSessions(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      toast.error('Failed to fetch sessions');
+      console.error('Error fetching sessions:', error);
+      toast.error(error?.message || 'Failed to fetch sessions');
+      setSessions([]);
     } finally {
       setLoading(prev => ({ ...prev, sessions: false }));
     }
@@ -323,9 +309,11 @@ const AdminPanel: React.FC = () => {
     setLoading(prev => ({ ...prev, authlogs: true }));
     try {
       const data = await authLogApi.getAuthLogs();
-      setAuthLogs(data);
+      setAuthLogs(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      toast.error('Failed to fetch auth logs');
+      console.error('Error fetching auth logs:', error);
+      toast.error(error?.message || 'Failed to fetch auth logs');
+      setAuthLogs([]);
     } finally {
       setLoading(prev => ({ ...prev, authlogs: false }));
     }
@@ -337,7 +325,9 @@ const AdminPanel: React.FC = () => {
       const data = await dashboardApi.getStats();
       setDashboardStats(data);
     } catch (error: any) {
-      toast.error('Failed to fetch dashboard stats');
+      console.error('Error fetching dashboard stats:', error);
+      toast.error(error?.message || 'Failed to fetch dashboard stats');
+      setDashboardStats(null);
     } finally {
       setLoading(prev => ({ ...prev, dashboard: false }));
     }
@@ -346,6 +336,8 @@ const AdminPanel: React.FC = () => {
   // ============================================
   // CRUD OPERATIONS
   // ============================================
+  
+  // CREATE USER
   const handleCreateUser = async () => {
     if (!formData.phone_number) {
       toast.error('Phone number is required');
@@ -355,10 +347,13 @@ const AdminPanel: React.FC = () => {
       toast.error('Password is required');
       return;
     }
+    if (formData.password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
 
     setIsProcessing(true);
     try {
-      // Create user
       const userData = {
         phone_number: formData.phone_number,
         email: formData.email || undefined,
@@ -376,38 +371,59 @@ const AdminPanel: React.FC = () => {
         password: formData.password,
       };
 
+      console.log('Creating user with data:', userData);
       const newUser = await userApi.createUser(userData);
-      toast.success('User created successfully');
+      console.log('User created:', newUser);
+      
+      toast.success(`User ${newUser.full_name || newUser.phone_number} created successfully`);
 
-      // If profile picture or bio/location provided, update profile
       if (formData.profile_picture || formData.bio || formData.location) {
         try {
-          await profileApi.createProfile({
+          const profileData = {
             user: newUser.id,
             profile_picture: formData.profile_picture || undefined,
             bio: formData.bio || undefined,
             location: formData.location || undefined,
-          });
+          };
+          await profileApi.createProfile(profileData);
+          console.log('Profile created for user:', newUser.id);
         } catch (profileError: any) {
-          toast.warning('User created but profile update failed');
+          console.error('Profile creation error:', profileError);
+          toast.error('User created but profile creation failed');
         }
       }
 
-      // Reset form and close modal
       resetForm();
       setShowModal(false);
-      fetchUsers();
-      fetchProfiles();
-      fetchDashboard();
+      await Promise.all([
+        fetchUsers(),
+        fetchProfiles(),
+        fetchDashboard()
+      ]);
+      
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to create user');
+      console.error('Create user error:', error);
+      const message = error.response?.data?.error || error.message || 'Failed to create user';
+      toast.error(message);
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // READ - View User
+  const handleViewUser = (user: User) => {
+    setSelectedUser(user);
+    setModalType('view');
+    setModalData(user);
+    setShowModal(true);
+  };
+
+  // UPDATE USER
   const handleUpdateUser = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser) {
+      toast.error('No user selected');
+      return;
+    }
     if (!formData.phone_number) {
       toast.error('Phone number is required');
       return;
@@ -415,7 +431,6 @@ const AdminPanel: React.FC = () => {
 
     setIsProcessing(true);
     try {
-      // Update user
       const userData: any = {
         phone_number: formData.phone_number,
         email: formData.email || undefined,
@@ -436,84 +451,125 @@ const AdminPanel: React.FC = () => {
         userData.password = formData.password;
       }
 
-      await userApi.updateUser(selectedUser.id, userData);
-      toast.success('User updated successfully');
+      console.log('Updating user:', selectedUser.id, userData);
+      const updatedUser = await userApi.updateUser(selectedUser.id, userData);
+      console.log('User updated:', updatedUser);
+      
+      toast.success(`User ${updatedUser.full_name || updatedUser.phone_number} updated successfully`);
 
-      // Update profile
       try {
-        // Check if profile exists
         const existingProfile = await profileApi.getProfileByUser(selectedUser.id);
+        const profileData = {
+          profile_picture: formData.profile_picture || undefined,
+          bio: formData.bio || undefined,
+          location: formData.location || undefined,
+        };
+        
         if (existingProfile) {
-          await profileApi.updateProfile(existingProfile.id, {
-            profile_picture: formData.profile_picture || undefined,
-            bio: formData.bio || undefined,
-            location: formData.location || undefined,
-          });
+          await profileApi.updateProfile(existingProfile.id, profileData);
+          console.log('Profile updated for user:', selectedUser.id);
         } else {
           await profileApi.createProfile({
             user: selectedUser.id,
-            profile_picture: formData.profile_picture || undefined,
-            bio: formData.bio || undefined,
-            location: formData.location || undefined,
+            ...profileData
           });
+          console.log('Profile created for user:', selectedUser.id);
         }
       } catch (profileError: any) {
-        // If profile doesn't exist, create one
-        if (profileError.response?.status === 404) {
-          await profileApi.createProfile({
-            user: selectedUser.id,
-            profile_picture: formData.profile_picture || undefined,
-            bio: formData.bio || undefined,
-            location: formData.location || undefined,
-          });
-        }
+        console.error('Profile update error:', profileError);
+        toast.error('User updated but profile update failed');
       }
 
       resetForm();
       setShowModal(false);
-      fetchUsers();
-      fetchProfiles();
-      fetchDashboard();
+      await Promise.all([
+        fetchUsers(),
+        fetchProfiles(),
+        fetchDashboard()
+      ]);
+      
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update user');
+      console.error('Update user error:', error);
+      const message = error.response?.data?.error || error.message || 'Failed to update user';
+      toast.error(message);
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // DELETE USER
   const handleDeleteUser = async (id: number) => {
+    if (!id) {
+      toast.error('Invalid user ID');
+      return;
+    }
+
     setIsProcessing(true);
     try {
+      console.log('Deleting user:', id);
       await userApi.deleteUser(id);
+      console.log('User deleted:', id);
+      
       toast.success('User deleted successfully');
       setShowModal(false);
-      fetchUsers();
-      fetchProfiles();
-      fetchDashboard();
+      setSelectedUser(null);
+      
+      await Promise.all([
+        fetchUsers(),
+        fetchProfiles(),
+        fetchDashboard()
+      ]);
+      
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to delete user');
+      console.error('Delete user error:', error);
+      const message = error.response?.data?.error || error.message || 'Failed to delete user';
+      toast.error(message);
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // ACTIVATE USER
   const handleActivateUser = async (id: number) => {
+    if (!id) {
+      toast.error('Invalid user ID');
+      return;
+    }
+
     try {
+      console.log('Activating user:', id);
       await userApi.activateUser(id);
-      toast.success('User activated');
-      fetchUsers();
+      console.log('User activated:', id);
+      
+      toast.success('User activated successfully');
+      await fetchUsers();
+      
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to activate user');
+      console.error('Activate user error:', error);
+      const message = error.response?.data?.error || error.message || 'Failed to activate user';
+      toast.error(message);
     }
   };
 
+  // DEACTIVATE USER
   const handleDeactivateUser = async (id: number) => {
+    if (!id) {
+      toast.error('Invalid user ID');
+      return;
+    }
+
     try {
+      console.log('Deactivating user:', id);
       await userApi.deactivateUser(id);
-      toast.success('User deactivated');
-      fetchUsers();
+      console.log('User deactivated:', id);
+      
+      toast.success('User deactivated successfully');
+      await fetchUsers();
+      
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to deactivate user');
+      console.error('Deactivate user error:', error);
+      const message = error.response?.data?.error || error.message || 'Failed to deactivate user';
+      toast.error(message);
     }
   };
 
@@ -546,12 +602,12 @@ const AdminPanel: React.FC = () => {
     resetForm();
     setModalType('add');
     setModalData(null);
+    setSelectedUser(null);
     setShowModal(true);
   };
 
   const openEditModal = (user: User) => {
     setSelectedUser(user);
-    // Load user data into form
     setFormData({
       phone_number: user.phone_number || '',
       email: user.email || '',
@@ -572,7 +628,6 @@ const AdminPanel: React.FC = () => {
       location: ''
     });
 
-    // Load profile data if exists
     const profile = profiles.find(p => p.user === user.id);
     if (profile) {
       setFormData(prev => ({
@@ -584,13 +639,6 @@ const AdminPanel: React.FC = () => {
     }
 
     setModalType('edit');
-    setModalData(user);
-    setShowModal(true);
-  };
-
-  const openViewModal = (user: User) => {
-    setSelectedUser(user);
-    setModalType('view');
     setModalData(user);
     setShowModal(true);
   };
@@ -654,7 +702,6 @@ const AdminPanel: React.FC = () => {
     return new Date(date).toLocaleString();
   };
 
-  // Get profile picture for a user
   const getUserProfilePicture = (userId: number): string | null => {
     const profile = profiles.find(p => p.user === userId);
     return profile?.profile_picture || null;
@@ -675,11 +722,16 @@ const AdminPanel: React.FC = () => {
       );
     }
 
-    if (!dashboardStats) return null;
+    if (!dashboardStats) {
+      return (
+        <div className="text-center py-12">
+          <p className="text-gray-500">No dashboard data available</p>
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-6 p-4">
-        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-white rounded-xl shadow-md p-4 text-center border-l-4 border-cyan-500">
             <p className="text-2xl font-bold text-gray-900">{dashboardStats.users.total}</p>
@@ -703,7 +755,6 @@ const AdminPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Additional Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl shadow-md p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Profiles</h3>
@@ -756,7 +807,6 @@ const AdminPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Role Distribution */}
         <div className="bg-white rounded-xl shadow-md p-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Role Distribution</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -777,6 +827,22 @@ const AdminPanel: React.FC = () => {
       return (
         <div className="flex items-center justify-center py-12">
           <FaSpinner className="animate-spin text-3xl text-cyan-500" />
+        </div>
+      );
+    }
+
+    if (users.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <FaUsers className="text-4xl text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500">No users found</p>
+          <button
+            onClick={openAddModal}
+            className="mt-4 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+          >
+            <FaPlus className="mr-2" />
+            Add First User
+          </button>
         </div>
       );
     }
@@ -830,7 +896,7 @@ const AdminPanel: React.FC = () => {
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       <button
-                        onClick={() => openViewModal(user)}
+                        onClick={() => handleViewUser(user)}
                         className="p-2 text-gray-500 hover:text-cyan-600 rounded-lg hover:bg-cyan-50"
                         title="View"
                       >
@@ -876,7 +942,7 @@ const AdminPanel: React.FC = () => {
         </table>
         {filteredUsers.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500">No users found</p>
+            <p className="text-gray-500">No users match your filters</p>
           </div>
         )}
       </div>
@@ -888,6 +954,15 @@ const AdminPanel: React.FC = () => {
       return (
         <div className="flex items-center justify-center py-12">
           <FaSpinner className="animate-spin text-3xl text-cyan-500" />
+        </div>
+      );
+    }
+
+    if (profiles.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <FaUserCircle className="text-4xl text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500">No profiles found</p>
         </div>
       );
     }
@@ -925,30 +1000,22 @@ const AdminPanel: React.FC = () => {
                 <td className="px-4 py-3 text-sm">{profile.location || '-'}</td>
                 <td className="px-4 py-3 text-sm">{formatDate(profile.created_at)}</td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => {
-                        setSelectedProfile(profile);
-                        setModalType('view');
-                        setModalData(profile);
-                        setShowModal(true);
-                      }}
-                      className="p-2 text-gray-500 hover:text-cyan-600 rounded-lg hover:bg-cyan-50"
-                      title="View"
-                    >
-                      <FaEye />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => {
+                      setModalType('view');
+                      setModalData(profile);
+                      setShowModal(true);
+                    }}
+                    className="p-2 text-gray-500 hover:text-cyan-600 rounded-lg hover:bg-cyan-50"
+                    title="View"
+                  >
+                    <FaEye />
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {profiles.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No profiles found</p>
-          </div>
-        )}
       </div>
     );
   };
@@ -958,6 +1025,15 @@ const AdminPanel: React.FC = () => {
       return (
         <div className="flex items-center justify-center py-12">
           <FaSpinner className="animate-spin text-3xl text-cyan-500" />
+        </div>
+      );
+    }
+
+    if (verifications.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <FaKey className="text-4xl text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500">No verifications found</p>
         </div>
       );
     }
@@ -1001,30 +1077,22 @@ const AdminPanel: React.FC = () => {
                 <td className="px-4 py-3 text-sm">{formatDate(verification.expires_at)}</td>
                 <td className="px-4 py-3 text-sm">{formatDate(verification.created_at)}</td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => {
-                        setSelectedVerification(verification);
-                        setModalType('view');
-                        setModalData(verification);
-                        setShowModal(true);
-                      }}
-                      className="p-2 text-gray-500 hover:text-cyan-600 rounded-lg hover:bg-cyan-50"
-                      title="View"
-                    >
-                      <FaEye />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => {
+                      setModalType('view');
+                      setModalData(verification);
+                      setShowModal(true);
+                    }}
+                    className="p-2 text-gray-500 hover:text-cyan-600 rounded-lg hover:bg-cyan-50"
+                    title="View"
+                  >
+                    <FaEye />
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {verifications.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No verifications found</p>
-          </div>
-        )}
       </div>
     );
   };
@@ -1034,6 +1102,15 @@ const AdminPanel: React.FC = () => {
       return (
         <div className="flex items-center justify-center py-12">
           <FaSpinner className="animate-spin text-3xl text-cyan-500" />
+        </div>
+      );
+    }
+
+    if (sessions.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <FaClock className="text-4xl text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500">No sessions found</p>
         </div>
       );
     }
@@ -1076,7 +1153,6 @@ const AdminPanel: React.FC = () => {
                   <div className="flex gap-1">
                     <button
                       onClick={() => {
-                        setSelectedSession(session);
                         setModalType('view');
                         setModalData(session);
                         setShowModal(true);
@@ -1109,11 +1185,6 @@ const AdminPanel: React.FC = () => {
             ))}
           </tbody>
         </table>
-        {sessions.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No sessions found</p>
-          </div>
-        )}
       </div>
     );
   };
@@ -1123,6 +1194,15 @@ const AdminPanel: React.FC = () => {
       return (
         <div className="flex items-center justify-center py-12">
           <FaSpinner className="animate-spin text-3xl text-cyan-500" />
+        </div>
+      );
+    }
+
+    if (authLogs.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <FaHistory className="text-4xl text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500">No auth logs found</p>
         </div>
       );
     }
@@ -1173,7 +1253,6 @@ const AdminPanel: React.FC = () => {
                 <td className="px-4 py-3">
                   <button
                     onClick={() => {
-                      setSelectedAuthLog(log);
                       setModalType('view');
                       setModalData(log);
                       setShowModal(true);
@@ -1190,7 +1269,7 @@ const AdminPanel: React.FC = () => {
         </table>
         {filteredAuthLogs.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500">No auth logs found</p>
+            <p className="text-gray-500">No auth logs match your filters</p>
           </div>
         )}
       </div>
@@ -1205,10 +1284,14 @@ const AdminPanel: React.FC = () => {
 
     const renderViewModal = () => {
       if (modalType === 'view' && modalData) {
+        const filteredData = Object.entries(modalData).filter(([key]) => 
+          !['password', 'profile', 'profile_picture'].includes(key)
+        );
+        
         return (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              {Object.entries(modalData).map(([key, value]) => (
+              {filteredData.map(([key, value]) => (
                 <div key={key} className="p-2 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500">{key}</p>
                   <p className="text-sm font-medium text-gray-900 break-all">
@@ -1236,7 +1319,6 @@ const AdminPanel: React.FC = () => {
           }
         }} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Profile Picture Upload */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">Profile Picture</label>
               <ImageUpload
@@ -1426,7 +1508,10 @@ const AdminPanel: React.FC = () => {
           <div className="flex justify-end gap-3 pt-4 border-t">
             <button
               type="button"
-              onClick={() => setShowModal(false)}
+              onClick={() => {
+                setShowModal(false);
+                resetForm();
+              }}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               Cancel
@@ -1460,7 +1545,10 @@ const AdminPanel: React.FC = () => {
           <p className="text-sm text-red-600 mb-4">This action cannot be undone.</p>
           <div className="flex justify-end gap-3">
             <button
-              onClick={() => setShowModal(false)}
+              onClick={() => {
+                setShowModal(false);
+                setSelectedUser(null);
+              }}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               Cancel
@@ -1503,7 +1591,10 @@ const AdminPanel: React.FC = () => {
               </div>
             </div>
             <button
-              onClick={() => setShowModal(false)}
+              onClick={() => {
+                setShowModal(false);
+                resetForm();
+              }}
               className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
             >
               <FaTimes />
@@ -1524,12 +1615,17 @@ const AdminPanel: React.FC = () => {
   // MAIN RENDER
   // ============================================
   useEffect(() => {
-    fetchDashboard();
-    fetchUsers();
-    fetchProfiles();
-    fetchVerifications();
-    fetchSessions();
-    fetchAuthLogs();
+    const loadAllData = async () => {
+      await Promise.all([
+        fetchDashboard(),
+        fetchUsers(),
+        fetchProfiles(),
+        fetchVerifications(),
+        fetchSessions(),
+        fetchAuthLogs()
+      ]);
+    };
+    loadAllData();
   }, []);
 
   const tabs = [
@@ -1555,13 +1651,15 @@ const AdminPanel: React.FC = () => {
               </div>
             </div>
             <button
-              onClick={() => {
-                fetchDashboard();
-                fetchUsers();
-                fetchProfiles();
-                fetchVerifications();
-                fetchSessions();
-                fetchAuthLogs();
+              onClick={async () => {
+                await Promise.all([
+                  fetchDashboard(),
+                  fetchUsers(),
+                  fetchProfiles(),
+                  fetchVerifications(),
+                  fetchSessions(),
+                  fetchAuthLogs()
+                ]);
                 toast.success('All data refreshed');
               }}
               className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center space-x-2 transition-colors"
@@ -1583,7 +1681,6 @@ const AdminPanel: React.FC = () => {
                 setRoleFilter('');
                 setStatusFilter('');
                 setActionFilter('');
-                setSelectedItems([]);
               }}
               className={`
                 flex items-center space-x-2 px-4 py-2.5 text-sm font-medium transition-all whitespace-nowrap
@@ -1685,7 +1782,7 @@ const AdminPanel: React.FC = () => {
           {activeTab === 'authlogs' && renderAuthLogsTable()}
         </div>
 
-        {/* Add User Button - Only shown on Users tab */}
+        {/* Add User Button */}
         {activeTab === 'users' && (
           <button
             onClick={openAddModal}
