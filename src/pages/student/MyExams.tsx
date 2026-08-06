@@ -546,7 +546,7 @@ const MyExams: React.FC = () => {
               {filter.search ? 'Try adjusting your search or filters' : 'You haven\'t attempted any exams yet'}
             </p>
             {!filter.search && (
-              <Link to="/student/sermons" className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium">
+              <Link to="/sermons" className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium">
                 <FaBook className="mr-2" />
                 Browse Sermons
               </Link>

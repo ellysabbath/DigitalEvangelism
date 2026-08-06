@@ -12,12 +12,12 @@ const Home: React.FC = () => {
       <HeroSlider />
       
       <div className="flex flex-wrap -mx-4 mt-8">
-        <div className="w-full lg:w-2/3 px-4">
+        <div className="w-full lg:w-3/3 px-4">
           <WelcomeSection />
         </div>
-        <div className="w-full lg:w-1/3 px-4">
+        {/* <div className="w-full lg:w-1/3 px-4">
           <Sidebar />
-        </div>
+        </div> */}
       </div>
       
       <ScrollingSlider />

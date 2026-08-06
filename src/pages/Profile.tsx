@@ -293,7 +293,7 @@ const Profile: React.FC = () => {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => setIsEditing(!isEditing)}
-            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
+            className="px-4 py-2 bg-white-600 hover:bg-grey-700 text-dark rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
           >
             {isEditing ? (
               <>
@@ -318,7 +318,7 @@ const Profile: React.FC = () => {
       </div>
 
       {/* Profile Card */}
-      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-2xl p-8 text-white">
+      <div className="bg-gradient-to-r from-white-600 to-white-600 rounded-2xl p-8 text-dark">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
           <div className="relative">
             <div className="w-32 h-32 rounded-full bg-white/20 flex items-center justify-center text-6xl font-bold border-4 border-white overflow-hidden">
@@ -347,8 +347,8 @@ const Profile: React.FC = () => {
           </div>
           <div className="flex-1 text-center md:text-left">
             <h2 className="text-2xl font-serif font-bold">{user.full_name || 'User'}</h2>
-            <p className="text-cyan-100 capitalize">{getRoleDisplayName()}</p>
-            <div className="mt-2 flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-cyan-100">
+            <p className="text-dark-100 capitalize">{getRoleDisplayName()}</p>
+            <div className="mt-2 flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-dark-100">
               <span className="flex items-center space-x-1">
                 <FaChurch className="text-xs" />
                 <span>{user.church_name || 'No church specified'}</span>
@@ -633,7 +633,7 @@ const Profile: React.FC = () => {
           >
             <FaBook className="text-2xl text-gray-500 mr-4" />
             <div>
-              <p className="font-medium text-gray-900">My Sermons</p>
+              <p className="font-medium text-gray-900">My Sermons & Exam's results</p>
               <p className="text-sm text-gray-500">View and manage your sermons</p>
             </div>
           </Link>
