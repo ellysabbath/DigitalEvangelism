@@ -402,7 +402,7 @@ const Login: React.FC = () => {
       navigate('/dashboard');
       
     } catch (error: any) {
-      console.error('❌ Login error:', error);
+      console.error(' Login error:', error);
       
       const errorMessage = error?.response?.data?.error || 
                           error?.message || 
@@ -544,17 +544,17 @@ const Login: React.FC = () => {
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-8 text-center">
+          <div className="bg-gradient-to-r from-white-600 to-white-600 px-8 py-8 text-center">
             <div className="flex justify-center mb-3">
               <div className="bg-white/20 backdrop-blur-sm p-3 rounded-2xl">
-                <FaGlobe className="text-3xl text-white" />
+                <FaGlobe className="text-3xl text-dark" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-            <p className="text-blue-100 text-sm">Digital Evangelism System</p>
+            <h1 className="text-3xl font-bold text-dark mb-2">Welcome Back</h1>
+            <p className="text-dark-100 text-sm">Digital Evangelism System</p>
             <div className="mt-2 inline-flex items-center px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full">
-              <FaShieldAlt className="text-white mr-2 text-xs" />
-              <span className="text-white text-xs">Login with Verification Code</span>
+              <FaShieldAlt className="text-dark mr-2 text-xs" />
+              <span className="text-dark text-xs">Login with Verification Code</span>
             </div>
           </div>
 
