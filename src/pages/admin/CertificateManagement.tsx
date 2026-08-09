@@ -8,7 +8,7 @@ import {
   FaCheckCircle, FaClock, FaExclamationCircle,
   FaFileAlt, FaUser, FaCalendarAlt, FaArrowLeft,
   FaUpload, FaSave, FaCertificate,
-  FaRegCopy, FaUsers
+  FaRegCopy
 } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
@@ -25,7 +25,6 @@ interface Certificate {
   recipient_name: string | null;
   recipient_email: string | null;
   recipient_phone: string | null;
-  recipient_user: number | null;
   position: string;
   other_position: string | null;
   display_position: string;
@@ -46,20 +45,8 @@ interface Certificate {
   updated_at: string;
 }
 
-interface User {
-  id: number;
-  full_name: string;
-  email: string;
-  phone_number: string;
-  role: string;
-  role_display: string;
-  is_active: boolean;
-  is_verified: boolean;
-}
-
 interface CertificateFormData {
   heading: string;
-  recipient_user: number | null;
   recipient_name: string;
   recipient_email: string;
   recipient_phone: string;
@@ -202,9 +189,6 @@ interface CertificateFormModalProps {
   certificate?: Certificate | null;
   loading: boolean;
   mode: 'create' | 'edit';
-  users?: User[];
-  loadingUsers?: boolean;
-  onFetchUsers?: () => void;
 }
 
 const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
@@ -213,14 +197,10 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
   onSave,
   certificate,
   loading,
-  mode,
-  users = [],
-  loadingUsers = false,
-  onFetchUsers
+  mode
 }) => {
   const [formData, setFormData] = useState<CertificateFormData>({
     heading: 'SEVENTH DAY ADVENTIST CHURCH',
-    recipient_user: null,
     recipient_name: '',
     recipient_email: '',
     recipient_phone: '',
@@ -248,22 +228,11 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [showUserSelect, setShowUserSelect] = useState(false);
 
-  // Fetch users when modal opens
-  useEffect(() => {
-    if (isOpen && onFetchUsers) {
-      onFetchUsers();
-    }
-  }, [isOpen, onFetchUsers]);
-
-  // Load certificate data for edit
   useEffect(() => {
     if (certificate && mode === 'edit') {
       setFormData({
-        heading: certificate.heading || 'SEVENTH DAY ADVENTIST CHURCH',
-        recipient_user: certificate.recipient_user || null,
+        heading: certificate.heading || 'CERTIFICATE FOR COURSE COMPLETION',
         recipient_name: certificate.recipient_name || '',
         recipient_email: certificate.recipient_email || '',
         recipient_phone: certificate.recipient_phone || '',
@@ -277,22 +246,8 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
         leader_signature: null,
         status: certificate.status || 'draft'
       });
-
-      // If there's a recipient_user, find and set it
-      if (certificate.recipient_user && users.length > 0) {
-        const found = users.find(u => u.id === certificate.recipient_user);
-        if (found) {
-          setSelectedUser(found);
-          setFormData(prev => ({
-            ...prev,
-            recipient_name: found.full_name || '',
-            recipient_email: found.email || '',
-            recipient_phone: found.phone_number || '',
-          }));
-        }
-      }
     }
-  }, [certificate, mode, users]);
+  }, [certificate, mode]);
 
   if (!isOpen) return null;
 
@@ -309,29 +264,6 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
     } else {
       setPreviews(prev => ({ ...prev, [field]: null }));
     }
-  };
-
-  const handleUserSelect = (user: User) => {
-    setSelectedUser(user);
-    setFormData(prev => ({
-      ...prev,
-      recipient_user: user.id,
-      recipient_name: user.full_name || '',
-      recipient_email: user.email || '',
-      recipient_phone: user.phone_number || '',
-    }));
-    setShowUserSelect(false);
-  };
-
-  const clearUserSelection = () => {
-    setSelectedUser(null);
-    setFormData(prev => ({
-      ...prev,
-      recipient_user: null,
-      recipient_name: '',
-      recipient_email: '',
-      recipient_phone: '',
-    }));
   };
 
   const validateForm = (): boolean => {
@@ -366,10 +298,6 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
     formDataToSend.append('position', formData.position);
     formDataToSend.append('working_time', formData.working_time);
     formDataToSend.append('status', formData.status || 'draft');
-    
-    if (formData.recipient_user) {
-      formDataToSend.append('recipient_user', String(formData.recipient_user));
-    }
     
     if (formData.position === 'OTHER' && formData.other_position) {
       formDataToSend.append('other_position', formData.other_position);
@@ -430,7 +358,7 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-dark/80 hover:text-cyan transition-colors p-2 hover:bg-dark/20 rounded-lg"
+            className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/20 rounded-lg"
           >
             <FaTimes />
           </button>
@@ -452,75 +380,6 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
                 placeholder="CERTIFICATE FOR COURSE COMPLETION"
               />
               {formErrors.heading && <p className="text-xs text-red-500 mt-1">{formErrors.heading}</p>}
-            </div>
-
-            {/* Select User - NEW */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Select User (Optional)</label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  {selectedUser ? (
-                    <div className="flex items-center justify-between p-2 border border-green-300 rounded-lg bg-green-50">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{selectedUser.full_name}</p>
-                        <p className="text-xs text-gray-500">{selectedUser.email} • {selectedUser.phone_number}</p>
-                        <span className="text-xs text-gray-400">Role: {selectedUser.role_display}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={clearUserSelection}
-                        className="text-red-500 hover:text-red-700 text-sm"
-                      >
-                        <FaTimes />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowUserSelect(!showUserSelect)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg hover:border-cyan-500 transition-colors flex items-center gap-2 text-gray-600"
-                      >
-                        <FaUsers className="text-cyan-500" />
-                        <span>{showUserSelect ? 'Hide Users' : 'Select a user'}</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* User List */}
-              {showUserSelect && !selectedUser && (
-                <div className="mt-2 border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
-                  {loadingUsers ? (
-                    <div className="flex items-center justify-center p-4">
-                      <FaSpinner className="animate-spin text-cyan-500" />
-                      <span className="ml-2 text-gray-500">Loading users...</span>
-                    </div>
-                  ) : users.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">
-                      <p>No users found</p>
-                    </div>
-                  ) : (
-                    users.map((user) => (
-                      <button
-                        key={user.id}
-                        type="button"
-                        onClick={() => handleUserSelect(user)}
-                        className="w-full px-4 py-2 text-left hover:bg-cyan-50 transition-colors border-b border-gray-100 last:border-0"
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{user.full_name}</p>
-                            <p className="text-xs text-gray-500">{user.email}</p>
-                          </div>
-                          <span className="text-xs text-gray-400">{user.role_display}</span>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Recipient Name */}
@@ -642,7 +501,7 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
           </div>
 
           {/* Image Uploads */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2">
             {/* Logo Image */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Logo Image</label>
@@ -687,9 +546,8 @@ const CertificateFormModal: React.FC<CertificateFormModalProps> = ({
               </div>
             </div>
 
-
-
-
+           
+         
           </div>
 
           {/* Actions */}
@@ -782,17 +640,17 @@ const ViewCertificateModal: React.FC<ViewCertificateModalProps> = ({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-white-600 to-white-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
           <div className="flex items-center space-x-3">
             <FaCertificate className="text-white text-xl" />
             <div>
-              <h3 className="text-dark font-bold text-lg">Certificate Details</h3>
-              <p className="text-dark-100 text-sm">{certificate.certificate_number}</p>
+              <h3 className="text-white font-bold text-lg">Certificate Details</h3>
+              <p className="text-cyan-100 text-sm">{certificate.certificate_number}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-dark/80 hover:text-cyan transition-colors p-2 hover:bg-cyan/20 rounded-lg"
+            className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/20 rounded-lg"
           >
             <FaTimes />
           </button>
@@ -905,9 +763,7 @@ const CertificateManagement: React.FC = () => {
   // ============================================================
 
   const [certificates, setCertificates] = useState<Certificate[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [loadingUsers, setLoadingUsers] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -953,10 +809,9 @@ const CertificateManagement: React.FC = () => {
   // ============================================================
 
   const API_BASE_URL = 'https://hopeprojects.pythonanywhere.com/api/certificates/certificates';
-  const AUTH_API_URL = 'https://hopeprojects.pythonanywhere.com/api/auth/crud/users';
 
   // ============================================================
-  // API CALLS
+  // API CALLS - DIRECT
   // ============================================================
 
   const getAuthHeaders = () => {
@@ -966,45 +821,6 @@ const CertificateManagement: React.FC = () => {
       'Authorization': token ? `Bearer ${token}` : '',
     };
   };
-
-  const getFormHeaders = () => {
-    const token = localStorage.getItem('access_token');
-    return {
-      'Authorization': token ? `Bearer ${token}` : '',
-    };
-  };
-
-  // Fetch Users from /auth/crud/users/
-  const fetchUsers = useCallback(async () => {
-    setLoadingUsers(true);
-    try {
-      const response = await fetch(AUTH_API_URL + '/', {
-        headers: getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      let usersData: User[] = [];
-      if (data.results) {
-        usersData = data.results;
-      } else if (Array.isArray(data)) {
-        usersData = data;
-      } else if (data.data && Array.isArray(data.data)) {
-        usersData = data.data;
-      }
-
-      setUsers(usersData);
-    } catch (err: any) {
-      console.error('Error fetching users:', err);
-      toast.error('Failed to load users');
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, []);
 
   const fetchCertificates = useCallback(async () => {
     setLoading(true);
@@ -1068,7 +884,9 @@ const CertificateManagement: React.FC = () => {
     try {
       const response = await fetch(API_BASE_URL + '/', {
         method: 'POST',
-        headers: getFormHeaders(),
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
         body: formData,
       });
 
@@ -1102,7 +920,9 @@ const CertificateManagement: React.FC = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/${id}/`, {
         method: 'PUT',
-        headers: getFormHeaders(),
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
         body: formData,
       });
 
@@ -1176,13 +996,11 @@ const CertificateManagement: React.FC = () => {
   };
 
   const downloadPDF = (id: string) => {
-    const token = localStorage.getItem('access_token');
-    window.open(`${API_BASE_URL}/${id}/download_pdf/?token=${token}`, '_blank');
+    window.open(`${API_BASE_URL}/${id}/download_pdf/`, '_blank');
   };
 
   const previewPDF = (id: string) => {
-    const token = localStorage.getItem('access_token');
-    window.open(`${API_BASE_URL}/${id}/preview_pdf/?token=${token}`, '_blank');
+    window.open(`${API_BASE_URL}/${id}/preview_pdf/`, '_blank');
   };
 
   const regeneratePDF = async (cert: Certificate) => {
@@ -1483,9 +1301,6 @@ const CertificateManagement: React.FC = () => {
                         <div>
                           <p className="text-sm font-medium text-gray-900">{cert.recipient_name || 'N/A'}</p>
                           <p className="text-xs text-gray-500">{cert.recipient_email || 'No email'}</p>
-                          {cert.recipient_user && (
-                            <p className="text-xs text-cyan-600">User ID: {cert.recipient_user}</p>
-                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -1580,9 +1395,6 @@ const CertificateManagement: React.FC = () => {
         onSave={createCertificate}
         loading={submitting}
         mode="create"
-        users={users}
-        loadingUsers={loadingUsers}
-        onFetchUsers={fetchUsers}
       />
 
       {/* Edit Modal */}
@@ -1596,9 +1408,6 @@ const CertificateManagement: React.FC = () => {
         certificate={editingCert}
         loading={submitting}
         mode="edit"
-        users={users}
-        loadingUsers={loadingUsers}
-        onFetchUsers={fetchUsers}
       />
 
       {/* View Modal */}
