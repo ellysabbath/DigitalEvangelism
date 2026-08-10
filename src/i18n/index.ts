@@ -1,8 +1,8 @@
+// src/i18n/index.ts (Vite version - FIXED)
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import Backend from 'i18next-http-backend';
-
 
 // Import translations directly
 import enUSTranslation from '../locales/en-US/translation.json';
@@ -32,6 +32,9 @@ const resources = {
   'el': { translation: elTranslation },
 };
 
+// Get environment variable safely for Vite
+const isDevelopment = import.meta.env.MODE === 'development';
+
 i18n
   .use(Backend)
   .use(LanguageDetector)
@@ -39,7 +42,7 @@ i18n
   .init({
     resources,
     fallbackLng: 'en-US',
-    debug: process.env.NODE_ENV === 'development',
+    debug: isDevelopment,
     
     interpolation: {
       escapeValue: false,
@@ -48,10 +51,11 @@ i18n
     detection: {
       order: ['localStorage', 'sessionStorage', 'navigator', 'htmlTag'],
       caches: ['localStorage'],
-      checkWhitelist: true,
+      // Remove checkForSimilarLanguages - it doesn't exist in this version
     },
     
-    whitelist: ['en-US', 'en-UK', 'sw', 'fr', 'de', 'zh', 'es', 'pt', 'ar', 'he', 'el'],
+    // Use supportedLngs instead of whitelist
+    supportedLngs: ['en-US', 'en-UK', 'sw', 'fr', 'de', 'zh', 'es', 'pt', 'ar', 'he', 'el'],
     
     react: {
       useSuspense: false,

@@ -375,35 +375,36 @@ const Login: React.FC = () => {
     }
   };
 
-  const onSubmit = async (data: LoginFormData) => {
-    try {
-      setLoginError('');
-      setCodeError(false);
-      setIsLoading(true);
-      
-      const fullPhoneNumber = formatPhoneNumber(data.countryCode, data.phoneNumber);
-      
-      const response = await login(fullPhoneNumber, data.verificationCode);
-      
-      toast.success(t('auth.loginSuccess'));
-      navigate('/dashboard');
-      
-    } catch (error: any) {
-      console.error('Login error:', error);
-      
-      const errorMessage = error?.response?.data?.error || 
-                          error?.message || 
-                          t('auth.loginError');
-      setLoginError(errorMessage);
-      setCodeError(true);
-      
-      setCode(Array(6).fill(''));
-      setValue('verificationCode', '');
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+const onSubmit = async (data: LoginFormData) => {
+  try {
+    setLoginError('');
+    setCodeError(false);
+    setIsLoading(true);
+    
+    const fullPhoneNumber = formatPhoneNumber(data.countryCode, data.phoneNumber);
+    
+    // Remove the unused 'response' variable
+    await login(fullPhoneNumber, data.verificationCode);
+    
+    toast.success(t('auth.loginSuccess'));
+    navigate('/dashboard');
+    
+  } catch (error: any) {
+    console.error('Login error:', error);
+    
+    const errorMessage = error?.response?.data?.error || 
+                        error?.message || 
+                        t('auth.loginError');
+    setLoginError(errorMessage);
+    setCodeError(true);
+    
+    setCode(Array(6).fill(''));
+    setValue('verificationCode', '');
+    toast.error(errorMessage);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleLogout = async () => {
     setIsProfileDropdownOpen(false);
