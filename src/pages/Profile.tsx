@@ -1,5 +1,6 @@
 // src/pages/Profile.tsx
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/context/AuthContext';
 import { useAdmin } from '../auth/context/AdminContext';
 import { Link, useNavigate } from 'react-router-dom';
@@ -31,6 +32,7 @@ interface UserStats {
 // ============================================
 
 const Profile: React.FC = () => {
+  const { t } = useTranslation();
   const { user, updateProfile, updateProfilePicture, logout, isLoading: authLoading } = useAuth();
   const { 
     students, 
@@ -80,23 +82,19 @@ const Profile: React.FC = () => {
   // ============================================
 
   const getUserStats = (): UserStats => {
-    // Get user's sermons
     const userSermons = sermons?.filter((s: any) => 
       s.author === user?.id || 
       s.author_name === user?.full_name
     ) || [];
 
-    // Get user's students (if evangelist)
     const userStudents = students?.filter((s: any) => 
       s.assigned_evangelist === user?.id
     ) || [];
 
-    // Get user's exams (if student)
     const userExams = examSubmissions?.filter((e: any) => 
       e.student === user?.id
     ) || [];
 
-    // Get graded exams
     const gradedExams = userExams.filter((e: any) => 
       e.status === 'graded' || e.status === 'reviewed'
     );
@@ -107,7 +105,7 @@ const Profile: React.FC = () => {
       certificatesEarned: userStudents.reduce((acc: number, s: any) => 
         acc + (s.certificates_earned || 0), 0
       ) || 0,
-      groupsJoined: 0, // Will be populated if groups API is available
+      groupsJoined: 0,
       totalSermons: userSermons.length || 0,
       totalStudents: userStudents.length || 0,
     };
@@ -144,11 +142,11 @@ const Profile: React.FC = () => {
         },
       });
       
-      toast.success('Profile updated successfully!');
+      toast.success(t('profile.profileUpdated'));
       setIsEditing(false);
     } catch (error: any) {
       console.error('Error updating profile:', error);
-      toast.error(error?.response?.data?.error || 'Failed to update profile');
+      toast.error(error?.response?.data?.error || t('profile.updateError'));
     } finally {
       setIsSaving(false);
     }
@@ -158,15 +156,13 @@ const Profile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+      toast.error(t('profile.imageTypeError'));
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size should be less than 5MB');
+      toast.error(t('profile.imageSizeError'));
       return;
     }
 
@@ -177,17 +173,17 @@ const Profile: React.FC = () => {
       reader.onloadend = async () => {
         const base64String = reader.result as string;
         await updateProfilePicture(base64String);
-        toast.success('Profile picture updated successfully!');
+        toast.success(t('profile.pictureUpdated'));
         setIsUploading(false);
       };
       reader.onerror = () => {
-        toast.error('Failed to read image file');
+        toast.error(t('profile.readError'));
         setIsUploading(false);
       };
       reader.readAsDataURL(file);
     } catch (error: any) {
       console.error('Error uploading profile picture:', error);
-      toast.error(error?.response?.data?.error || 'Failed to update profile picture');
+      toast.error(error?.response?.data?.error || t('profile.pictureError'));
       setIsUploading(false);
     }
   };
@@ -221,13 +217,13 @@ const Profile: React.FC = () => {
   const getRoleDisplayName = () => {
     const role = user?.role || 'student';
     const names: Record<string, string> = {
-      admin: 'Administrator',
-      evangelist: 'Evangelist',
-      student: 'Student',
-      super_admin: 'Super Admin',
-      church_admin: 'Church Admin'
+      admin: t('dashboard.administrator'),
+      evangelist: t('dashboard.evangelist'),
+      student: t('dashboard.student'),
+      super_admin: t('dashboard.superAdmin'),
+      church_admin: t('dashboard.churchAdmin')
     };
-    return names[role] || 'Member';
+    return names[role] || t('dashboard.member');
   };
 
   const getMemberSince = () => {
@@ -238,7 +234,7 @@ const Profile: React.FC = () => {
         day: 'numeric',
       });
     }
-    return 'N/A';
+    return t('profile.na');
   };
 
   // ============================================
@@ -250,7 +246,7 @@ const Profile: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <FaSpinner className="animate-spin text-4xl text-cyan-500 mx-auto mb-4" />
-          <p className="text-gray-500">Loading profile...</p>
+          <p className="text-gray-500">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -261,9 +257,9 @@ const Profile: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <FaUserCircle className="text-6xl text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">Please login to view your profile</p>
+          <p className="text-gray-500">{t('profile.loginToView')}</p>
           <Link to="/login" className="mt-4 inline-block text-cyan-600 hover:text-cyan-700 font-medium">
-            Login
+            {t('auth.login')}
           </Link>
         </div>
       </div>
@@ -286,24 +282,24 @@ const Profile: React.FC = () => {
             <FaArrowLeft className="text-gray-500 group-hover:text-cyan-600 transition-colors" />
           </button>
           <div>
-            <h1 className="text-3xl font-serif font-bold text-gray-900">My Profile</h1>
-            <p className="mt-1 text-gray-600">Manage your personal information</p>
+            <h1 className="text-3xl font-serif font-bold text-gray-900">{t('profile.title')}</h1>
+            <p className="mt-1 text-gray-600">{t('profile.subtitle')}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => setIsEditing(!isEditing)}
-            className="px-4 py-2 bg-white-600 hover:bg-grey-700 text-dark rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
+            className="px-4 py-2 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
           >
             {isEditing ? (
               <>
                 <FaTimes />
-                <span>Cancel</span>
+                <span>{t('common.cancel')}</span>
               </>
             ) : (
               <>
                 <FaEdit />
-                <span>Edit Profile</span>
+                <span>{t('profile.editProfile')}</span>
               </>
             )}
           </button>
@@ -312,7 +308,7 @@ const Profile: React.FC = () => {
             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
           >
             <FaSignOutAlt />
-            <span>Logout</span>
+            <span>{t('nav.logout')}</span>
           </button>
         </div>
       </div>
@@ -334,7 +330,7 @@ const Profile: React.FC = () => {
                 <span>{getUserInitials()}</span>
               )}
             </div>
-            <label className="absolute bottom-0 right-0 p-2 bg-white rounded-full text-cyan-600 hover:bg-cyan-50 transition-colors cursor-pointer shadow-md">
+            <label className="absolute bottom-0 right-0 p-2 bg-white rounded-full text-dark-600 hover:bg-cyan-50 transition-colors cursor-pointer shadow-md">
               <FaCamera className="text-sm" />
               <input
                 type="file"
@@ -351,19 +347,19 @@ const Profile: React.FC = () => {
             <div className="mt-2 flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-dark-100">
               <span className="flex items-center space-x-1">
                 <FaChurch className="text-xs" />
-                <span>{user.church_name || 'No church specified'}</span>
+                <span>{user.church_name || t('profile.noChurch')}</span>
               </span>
               <span className="flex items-center space-x-1">
                 <FaMapMarkerAlt className="text-xs" />
-                <span>{user.city || 'Unknown'}, {user.region || ''}</span>
+                <span>{user.city || t('profile.unknown')}, {user.region || ''}</span>
               </span>
               <span className="flex items-center space-x-1">
                 <FaCalendarAlt className="text-xs" />
-                <span>Member since {getMemberSince()}</span>
+                <span>{t('profile.memberSince')} {getMemberSince()}</span>
               </span>
             </div>
             {user.profile?.bio && (
-              <p className="mt-3 text-cyan-100 text-sm max-w-md">{user.profile.bio}</p>
+              <p className="mt-3 text-dark-100 text-sm max-w-md">{user.profile.bio}</p>
             )}
           </div>
         </div>
@@ -374,7 +370,7 @@ const Profile: React.FC = () => {
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-cyan-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Exams</p>
+              <p className="text-sm text-gray-600">{t('profile.totalExams')}</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalExams}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-full">
@@ -385,7 +381,7 @@ const Profile: React.FC = () => {
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Completed</p>
+              <p className="text-sm text-gray-600">{t('profile.completed')}</p>
               <p className="text-2xl font-bold text-gray-900">{stats.completedExams}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-full">
@@ -396,7 +392,7 @@ const Profile: React.FC = () => {
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Certificates</p>
+              <p className="text-sm text-gray-600">{t('profile.certificates')}</p>
               <p className="text-2xl font-bold text-gray-900">{stats.certificatesEarned}</p>
             </div>
             <div className="p-3 bg-yellow-100 rounded-full">
@@ -407,7 +403,7 @@ const Profile: React.FC = () => {
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Sermons</p>
+              <p className="text-sm text-gray-600">{t('profile.sermons')}</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalSermons}</p>
             </div>
             <div className="p-3 bg-purple-100 rounded-full">
@@ -422,7 +418,7 @@ const Profile: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center">
             <FaUserEdit className="mr-2 text-cyan-500" />
-            Personal Information
+            {t('profile.personalInfo')}
           </h3>
           {isEditing && (
             <button
@@ -435,7 +431,7 @@ const Profile: React.FC = () => {
               ) : (
                 <FaSave />
               )}
-              <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
+              <span>{isSaving ? t('common.loading') : t('profile.saveChanges')}</span>
             </button>
           )}
         </div>
@@ -444,7 +440,7 @@ const Profile: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Full Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Full Name</label>
+              <label className="block text-sm font-medium text-gray-700">{t('auth.fullName')}</label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <FaUser className="text-gray-400" />
@@ -463,7 +459,7 @@ const Profile: React.FC = () => {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <label className="block text-sm font-medium text-gray-700">{t('auth.email')}</label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <FaEnvelope className="text-gray-400" />
@@ -483,7 +479,7 @@ const Profile: React.FC = () => {
 
             {/* Phone Number */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+              <label className="block text-sm font-medium text-gray-700">{t('auth.phone')}</label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <FaPhone className="text-gray-400" />
@@ -502,7 +498,7 @@ const Profile: React.FC = () => {
 
             {/* Church Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Church Name</label>
+              <label className="block text-sm font-medium text-gray-700">{t('auth.churchName')}</label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <FaChurch className="text-gray-400" />
@@ -521,7 +517,7 @@ const Profile: React.FC = () => {
 
             {/* Region */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Region</label>
+              <label className="block text-sm font-medium text-gray-700">{t('auth.region')}</label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <FaMapMarkerAlt className="text-gray-400" />
@@ -540,7 +536,7 @@ const Profile: React.FC = () => {
 
             {/* City */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">City/Village</label>
+              <label className="block text-sm font-medium text-gray-700">{t('auth.city')}</label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <FaCity className="text-gray-400" />
@@ -559,7 +555,7 @@ const Profile: React.FC = () => {
 
             {/* Street */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Street Address</label>
+              <label className="block text-sm font-medium text-gray-700">{t('auth.streetAddress')}</label>
               <div className="mt-1 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <FaStreetView className="text-gray-400" />
@@ -578,7 +574,7 @@ const Profile: React.FC = () => {
 
             {/* Bio */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Bio</label>
+              <label className="block text-sm font-medium text-gray-700">{t('profile.bio')}</label>
               <div className="mt-1 relative">
                 <div className="absolute top-3 left-3 pointer-events-none">
                   <FaInfoCircle className="text-gray-400" />
@@ -592,7 +588,7 @@ const Profile: React.FC = () => {
                   className={`w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${
                     !isEditing && 'bg-gray-50 cursor-not-allowed'
                   }`}
-                  placeholder="Tell us about yourself..."
+                  placeholder={t('profile.bioPlaceholder')}
                 />
               </div>
             </div>
@@ -603,7 +599,7 @@ const Profile: React.FC = () => {
             <div className="mt-4 p-4 bg-cyan-50 rounded-lg border border-cyan-200 text-center">
               <p className="text-sm text-cyan-700">
                 <FaEdit className="inline mr-2" />
-                Click the "Edit Profile" button above to update your information.
+                {t('profile.editHint')}
               </p>
             </div>
           )}
@@ -614,7 +610,7 @@ const Profile: React.FC = () => {
       <div className="bg-white rounded-xl shadow-md p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
           <FaCog className="mr-2 text-cyan-500" />
-          Account Actions
+          {t('profile.accountActions')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
@@ -623,8 +619,8 @@ const Profile: React.FC = () => {
           >
             <FaCog className="text-2xl text-gray-500 mr-4" />
             <div>
-              <p className="font-medium text-gray-900">Settings</p>
-              <p className="text-sm text-gray-500">Manage your account settings</p>
+              <p className="font-medium text-gray-900">{t('profile.settings')}</p>
+              <p className="text-sm text-gray-500">{t('profile.settingsDesc')}</p>
             </div>
           </Link>
           <Link
@@ -633,8 +629,8 @@ const Profile: React.FC = () => {
           >
             <FaBook className="text-2xl text-gray-500 mr-4" />
             <div>
-              <p className="font-medium text-gray-900">My Sermons & Exam's results</p>
-              <p className="text-sm text-gray-500">View and manage your sermons</p>
+              <p className="font-medium text-gray-900">{t('profile.sermonsAndExams')}</p>
+              <p className="text-sm text-gray-500">{t('profile.sermonsAndExamsDesc')}</p>
             </div>
           </Link>
           <Link
@@ -643,8 +639,8 @@ const Profile: React.FC = () => {
           >
             <FaCertificate className="text-2xl text-gray-500 mr-4" />
             <div>
-              <p className="font-medium text-gray-900">My Certificates</p>
-              <p className="text-sm text-gray-500">View your earned certificates</p>
+              <p className="font-medium text-gray-900">{t('profile.myCertificates')}</p>
+              <p className="text-sm text-gray-500">{t('profile.myCertificatesDesc')}</p>
             </div>
           </Link>
           <button
@@ -653,8 +649,8 @@ const Profile: React.FC = () => {
           >
             <FaSignOutAlt className="text-2xl text-red-500 mr-4" />
             <div>
-              <p className="font-medium text-red-700">Logout</p>
-              <p className="text-sm text-red-500">Sign out of your account</p>
+              <p className="font-medium text-red-700">{t('nav.logout')}</p>
+              <p className="text-sm text-red-500">{t('profile.logoutDesc')}</p>
             </div>
           </button>
         </div>

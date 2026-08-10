@@ -1,6 +1,7 @@
 // src/pages/SermonDetail.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   FaHeart, FaComment, FaShare, FaBookmark, 
   FaQrcode, FaFacebook, FaTwitter, FaWhatsapp, 
@@ -8,14 +9,18 @@ import {
   FaCalendar, FaClock, FaCheckCircle, FaUserPlus,
   FaSpinner, FaUsers, FaBible, 
   FaChartLine, FaTimesCircle, FaQuestion,
-  FaEdit, FaCheck, FaList, FaExclamationTriangle
+  FaEdit, FaCheck, FaList, FaExclamationTriangle,
+  FaTimes, FaUser,  FaLock
 } from 'react-icons/fa';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../auth/context/AuthContext';
 import { useAdmin } from '../auth/context/AdminContext';
 import { sermonsAPI, commentsAPI } from '../services/api';
-import type { Comment } from '../types/data';
 import toast from 'react-hot-toast';
+
+// ============================================================
+// TYPES
+// ============================================================
 
 interface SermonData {
   id: number;
@@ -37,28 +42,289 @@ interface SermonData {
   updated_at: string;
 }
 
-// interface ExamAnswer {
-//   questionId: string;
-//   answer: string | string[];
-//   maxScore: number;
-// }
+interface LocalComment {
+  id: number;
+  content: string;
+  user: number;
+  user_name: string;
+  user_avatar?: string | null;
+  sermon: number;
+  likes: number;
+  like_count: number;
+  is_liked: boolean;
+  reply_count: number;
+  is_active: boolean;
+  parent: number | null;
+  created_at: string;
+  updated_at: string;
+  replies?: LocalComment[];
+}
+
+// ============================================================
+// LOGIN REQUIRED MODAL
+// ============================================================
+
+interface LoginRequiredModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onLogin: () => void;
+  onRegister: () => void;
+  action: string;
+}
+
+const LoginRequiredModal: React.FC<LoginRequiredModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onLogin, 
+  onRegister, 
+  action 
+}) => {
+  const { t } = useTranslation();
+  
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+        <div className="bg-gradient-to-r from-white-600 to-white-600 px-6 py-5 text-center">
+          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+            <FaUser className="text-dark text-3xl" />
+          </div>
+          <h3 className="text-dark font-bold text-xl">{t('auth.loginRequired')}</h3>
+          <p className="text-dark-100 text-sm mt-1">
+            {t('auth.loginTo', { action: action })}
+          </p>
+        </div>
+
+        <div className="p-6">
+          <div className="space-y-3 mb-6">
+            <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
+              <FaUser className="text-cyan-500" />
+              <span className="text-sm text-gray-600">{t('auth.email')}</span>
+            </div>
+            <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
+              <FaLock className="text-cyan-500" />
+              <span className="text-sm text-gray-600">{t('auth.password')}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col space-y-3">
+            <button
+              onClick={onLogin}
+              className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all font-semibold"
+            >
+              {t('auth.login')}
+            </button>
+            <button
+              onClick={onRegister}
+              className="w-full py-3 border-2 border-cyan-600 text-cyan-600 hover:bg-cyan-50 rounded-lg transition-all font-semibold"
+            >
+              {t('auth.register')}
+            </button>
+            <button
+              onClick={onClose}
+              className="w-full py-2 text-gray-500 hover:text-gray-700 transition-colors text-sm"
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// SHARE MODAL
+// ============================================================
+
+interface ShareModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  sermonTitle: string;
+  sermonUrl: string;
+  onShare: (platform: string) => void;
+}
+
+const ShareModal: React.FC<ShareModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  sermonTitle, 
+  sermonUrl, 
+  onShare 
+}) => {
+  const { t } = useTranslation();
+  
+  if (!isOpen) return null;
+
+  const shareOptions = [
+    { id: 'facebook', label: 'Facebook', icon: <FaFacebook className="text-blue-600 text-xl" />, color: 'hover:bg-blue-50' },
+    { id: 'twitter', label: 'Twitter', icon: <FaTwitter className="text-blue-400 text-xl" />, color: 'hover:bg-blue-50' },
+    { id: 'whatsapp', label: 'WhatsApp', icon: <FaWhatsapp className="text-green-500 text-xl" />, color: 'hover:bg-green-50' },
+    { id: 'telegram', label: 'Telegram', icon: <FaTelegram className="text-blue-500 text-xl" />, color: 'hover:bg-blue-50' },
+    { id: 'copy', label: 'Copy Link', icon: <FaCopy className="text-gray-500 text-xl" />, color: 'hover:bg-gray-50' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+        <div className="bg-gradient-to-r from-white-600 to-white-600 px-6 py-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-dark font-bold text-lg">{t('sermons.shareSermon')}</h3>
+            <p className="text-dark-100 text-sm truncate max-w-[200px]">{sermonTitle}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-dark/80 hover:text-gray transition-colors p-2 hover:bg-white/20 rounded-lg"
+          >
+            <FaTimes />
+          </button>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-2 gap-3">
+            {shareOptions.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => {
+                  onShare(option.id);
+                  if (option.id !== 'copy') {
+                    onClose();
+                  }
+                }}
+                className={`flex items-center justify-center space-x-3 p-4 rounded-xl border border-gray-200 hover:shadow-md transition-all ${option.color}`}
+              >
+                {option.icon}
+                <span className="text-sm font-medium text-gray-700">{option.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-xs text-gray-500 mb-1">{t('sermons.shareableLink')}</p>
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={sermonUrl}
+                readOnly
+                className="flex-1 text-sm text-gray-700 bg-transparent border-none focus:outline-none truncate"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(sermonUrl);
+                  toast.success(t('sermons.linkCopied'));
+                }}
+                className="px-3 py-1 bg-cyan-100 hover:bg-cyan-200 text-cyan-700 rounded-lg text-sm font-medium transition-colors"
+              >
+                {t('common.copy')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// QR CODE MODAL
+// ============================================================
+
+interface QRCodeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  url: string;
+  title: string;
+}
+
+const QRCodeModal: React.FC<QRCodeModalProps> = ({ isOpen, onClose, url, title }) => {
+  const { t } = useTranslation();
+  
+  if (!isOpen) return null;
+
+  const handleDownloadQR = () => {
+    const canvas = document.getElementById('qr-code-canvas') as HTMLCanvasElement;
+    if (canvas) {
+      const link = document.createElement('a');
+      link.download = `qr-code-${title.replace(/\s+/g, '-').toLowerCase()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast.success(t('sermons.qrDownloaded'));
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden">
+        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-white font-bold text-lg">{t('sermons.qrCode')}</h3>
+            <p className="text-cyan-100 text-sm truncate max-w-[180px]">{title}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/20 rounded-lg"
+          >
+            <FaTimes />
+          </button>
+        </div>
+
+        <div className="p-6 flex flex-col items-center">
+          <div className="p-6 bg-white rounded-xl border-2 border-gray-200">
+            <QRCodeSVG
+              id="qr-code-canvas"
+              value={url}
+              size={200}
+              level="H"
+              includeMargin={true}
+              fgColor="#0e7490"
+            />
+          </div>
+          <p className="mt-4 text-sm text-gray-600 text-center">{t('sermons.scanToRead')}</p>
+          <div className="mt-4 flex space-x-3 w-full">
+            <button
+              onClick={handleDownloadQR}
+              className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all"
+            >
+              {t('sermons.downloadQR')}
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
+            >
+              {t('common.close')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
 
 const SermonDetail: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { 
     refreshExamSubmissions,
     submitExam,
-    checkSubmission
+    checkSubmission,
+    likeComment
   } = useAdmin();
   
   // ========== STATE ==========
   const [sermon, setSermon] = useState<SermonData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [showShareOptions, setShowShareOptions] = useState(false);
-  const [showQRCode, setShowQRCode] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginAction, setLoginAction] = useState<string>('');
   const [bookmarked, setBookmarked] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
@@ -69,16 +335,16 @@ const SermonDetail: React.FC = () => {
   const [likeCount, setLikeCount] = useState(0);
   const [isLiking, setIsLiking] = useState(false);
   const [isCommenting, setIsCommenting] = useState(false);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<LocalComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   
-  // Exam state - using index as key
+  // Exam state
   const [examAnswers, setExamAnswers] = useState<Record<number, string | string[]>>({});
   const [isSubmittingExam, setIsSubmittingExam] = useState(false);
   const [hasExistingSubmission, setHasExistingSubmission] = useState(false);
   const [examStartTime, setExamStartTime] = useState<number | null>(null);
 
-  // ========== REFS TO PREVENT DUPLICATE REQUESTS ==========
+  // ========== REFS ==========
   const hasFetchedSermon = useRef(false);
   const hasCheckedSubmission = useRef(false);
   const hasFetchedComments = useRef(false);
@@ -109,15 +375,15 @@ const SermonDetail: React.FC = () => {
         
       } catch (err: any) {
         console.error('Error fetching sermon:', err);
-        setError(err.response?.data?.error || 'Failed to load sermon');
-        toast.error('Failed to load sermon');
+        setError(err.response?.data?.error || t('sermons.loadError'));
+        toast.error(t('sermons.loadError'));
       } finally {
         setLoading(false);
       }
     };
 
     fetchSermon();
-  }, [id]);
+  }, [id, t]);
 
   // ========== CHECK SUBMISSION ==========
   useEffect(() => {
@@ -149,16 +415,34 @@ const SermonDetail: React.FC = () => {
       setLoadingComments(true);
       try {
         const response = await commentsAPI.list(sermon.id);
-        setComments(response.data);
+        const mappedComments: LocalComment[] = response.data.map((c: any) => ({
+          id: c.id,
+          content: c.content,
+          user: c.user || 0,
+          user_name: c.user_name || 'Anonymous',
+          user_avatar: c.user_avatar || null,
+          sermon: c.sermon || sermon.id,
+          likes: c.likes || 0,
+          like_count: c.like_count || c.likes || 0,
+          is_liked: c.is_liked || false,
+          reply_count: c.reply_count || 0,
+          is_active: c.is_active !== undefined ? c.is_active : true,
+          parent: c.parent || null,
+          created_at: c.created_at || new Date().toISOString(),
+          updated_at: c.updated_at || new Date().toISOString(),
+          replies: c.replies || []
+        }));
+        setComments(mappedComments);
       } catch (error: any) {
         console.error('Error fetching comments:', error);
+        toast.error(t('sermons.commentLoadError'));
       } finally {
         setLoadingComments(false);
       }
     };
 
     fetchComments();
-  }, [id, sermon]);
+  }, [id, sermon, t]);
 
   // ========== HANDLE LIKE ==========
   const handleLike = async () => {
@@ -174,10 +458,10 @@ const SermonDetail: React.FC = () => {
       
       if (newLikeState) {
         localStorage.setItem(`liked_${id}`, 'true');
-        toast.success('Liked this sermon!');
+        toast.success(t('sermons.liked'));
       } else {
         localStorage.removeItem(`liked_${id}`);
-        toast('Unliked sermon', { icon: <FaHeart className="text-gray-400" /> });
+        toast.success(t('sermons.unliked'));
       }
       
       const response = await sermonsAPI.get(sermonId);
@@ -187,7 +471,7 @@ const SermonDetail: React.FC = () => {
       console.error('Error toggling like:', error);
       setIsLiked(!isLiked);
       setLikeCount(prev => isLiked ? prev + 1 : prev - 1);
-      toast.error('Failed to update like');
+      toast.error(t('sermons.likeError'));
     } finally {
       setIsLiking(false);
     }
@@ -196,14 +480,15 @@ const SermonDetail: React.FC = () => {
   // ========== HANDLE COMMENT ==========
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!comment.trim()) {
-      toast.error('Please enter a comment');
+      toast.error(t('sermons.enterComment'));
       return;
     }
 
     if (!user) {
-      toast.error('Please login to comment');
-      navigate('/login');
+      setLoginAction(t('auth.comment'));
+      setShowLoginModal(true);
       return;
     }
 
@@ -216,48 +501,91 @@ const SermonDetail: React.FC = () => {
         content: comment.trim()
       });
       
-      setComments(prev => [response.data, ...prev]);
+      const newComment: LocalComment = {
+        id: response.data.id,
+        content: response.data.content,
+        user: response.data.user || user.id,
+        user_name: response.data.user_name || user.full_name || 'Anonymous',
+        user_avatar: response.data.user_avatar || null,
+        sermon: sermon.id,
+        likes: 0,
+        like_count: 0,
+        is_liked: false,
+        reply_count: 0,
+        is_active: true,
+        parent: null,
+        created_at: response.data.created_at || new Date().toISOString(),
+        updated_at: response.data.updated_at || new Date().toISOString(),
+        replies: []
+      };
+      
+      setComments(prev => [newComment, ...prev]);
       setComment('');
-      toast.success('Comment posted successfully!');
+      toast.success(t('sermons.commentPosted'));
+      
     } catch (error: any) {
       console.error('Error posting comment:', error);
-      toast.error(error.response?.data?.error || 'Failed to post comment');
+      toast.error(error.response?.data?.error || t('sermons.commentError'));
     } finally {
       setIsCommenting(false);
     }
   };
 
   // ========== HANDLE COMMENT LIKE ==========
-  const handleCommentLike = async (commentId: number) => {
-    try {
-      const response = await commentsAPI.like(commentId);
-      
-      setComments(prev => prev.map(comment => {
-        if (comment.id === commentId) {
-          return {
-            ...comment,
-            likes: response.data.likes,
-            is_liked: response.data.is_liked
-          };
-        }
-        return comment;
-      }));
-      
-      toast.success(response.data.is_liked ? 'Liked comment!' : 'Unliked comment');
-    } catch (error: any) {
-      console.error('Error toggling comment like:', error);
-      toast.error('Failed to like comment');
+// ========== HANDLE COMMENT LIKE ==========
+const handleCommentLike = async (commentId: number) => {
+  if (!user) {
+    setLoginAction(t('auth.likeComment'));
+    setShowLoginModal(true);
+    return;
+  }
+  
+  // Optimistic update - toggle the like locally first for better UX
+  setComments(prev => prev.map(c => {
+    if (c.id === commentId) {
+      const newIsLiked = !c.is_liked;
+      return {
+        ...c,
+        likes: newIsLiked ? (c.likes || 0) + 1 : (c.likes || 0) - 1,
+        like_count: newIsLiked ? (c.like_count || 0) + 1 : (c.like_count || 0) - 1,
+        is_liked: newIsLiked
+      };
     }
-  };
+    return c;
+  }));
+  
+  try {
+    // Call the API
+    await likeComment(commentId);
+    // No need to update state here since we already did it optimistically
+    // The AdminContext will also update its own state
+  } catch (error: any) {
+    console.error('Error toggling comment like:', error);
+    // Revert the optimistic update on error
+    setComments(prev => prev.map(c => {
+      if (c.id === commentId) {
+        const revertIsLiked = !c.is_liked;
+        return {
+          ...c,
+          likes: revertIsLiked ? (c.likes || 0) + 1 : (c.likes || 0) - 1,
+          like_count: revertIsLiked ? (c.like_count || 0) + 1 : (c.like_count || 0) - 1,
+          is_liked: revertIsLiked
+        };
+      }
+      return c;
+    }));
+    toast.error(t('sermons.commentLikeError'));
+  }
+};
 
   // ========== HANDLE BOOKMARK ==========
   const handleBookmark = () => {
     setBookmarked(!bookmarked);
     if (!bookmarked) {
-      toast.success('Bookmarked this sermon!');
+      toast.success(t('sermons.bookmarked'));
       localStorage.setItem(`bookmarked_${id}`, 'true');
     } else {
-      toast('Removed bookmark', { icon: <FaBookmark className="text-gray-400" /> });
+      toast.success(t('sermons.unbookmarked'));
       localStorage.removeItem(`bookmarked_${id}`);
     }
   };
@@ -265,8 +593,8 @@ const SermonDetail: React.FC = () => {
   // ========== HANDLE JOIN ==========
   const handleJoinSermon = () => {
     if (!user) {
-      toast.error('Please login or register to join this sermon');
-      navigate('/login', { state: { from: `/join/sermon-${sermon?.id}?sermon=${encodeURIComponent(sermon?.title || '')}` } });
+      setLoginAction(t('auth.joinSermon'));
+      setShowLoginModal(true);
       return;
     }
 
@@ -277,7 +605,7 @@ const SermonDetail: React.FC = () => {
         localStorage.setItem(`joined_${sermon.id}`, 'true');
       }
       setIsJoining(false);
-      toast.success(`You have joined "${sermon?.title}" successfully!`);
+      toast.success(t('sermons.joined', { title: sermon?.title }));
       navigate(`/join/sermon-${sermon?.id}?sermon=${encodeURIComponent(sermon?.title || '')}`);
     }, 1500);
   };
@@ -285,7 +613,7 @@ const SermonDetail: React.FC = () => {
   // ========== HANDLE SHARE ==========
   const handleShare = (platform: string) => {
     const url = window.location.href;
-    const text = `Check out this powerful sermon: ${sermon?.title || 'Sermon'}`;
+    const text = t('sermons.shareText', { title: sermon?.title || 'Sermon' });
     
     const shareUrls: Record<string, string> = {
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
@@ -296,15 +624,25 @@ const SermonDetail: React.FC = () => {
 
     if (platform === 'copy') {
       navigator.clipboard.writeText(url);
-      toast.success('Link copied to clipboard!');
-      setShowShareOptions(false);
+      toast.success(t('sermons.linkCopied'));
+      setShowShareModal(false);
       return;
     }
 
     if (platform in shareUrls) {
       window.open(shareUrls[platform as keyof typeof shareUrls], '_blank');
-      setShowShareOptions(false);
+      setShowShareModal(false);
     }
+  };
+
+  // ========== HANDLE EXAM ==========
+  const handleTakeExam = () => {
+    if (!user) {
+      setLoginAction(t('auth.takeExam'));
+      setShowLoginModal(true);
+      return;
+    }
+    toggleExam();
   };
 
   // ========== HANDLE EXAM ANSWER CHANGE ==========
@@ -318,8 +656,8 @@ const SermonDetail: React.FC = () => {
   // ========== SUBMIT EXAM ==========
   const handleSubmitExam = async () => {
     if (!user) {
-      toast.error('Please login to submit the exam');
-      navigate('/login');
+      setLoginAction(t('auth.submitExam'));
+      setShowLoginModal(true);
       return;
     }
 
@@ -327,7 +665,6 @@ const SermonDetail: React.FC = () => {
     
     const questions = sermon.questions || [];
 
-    // Validate all required questions are answered
     const requiredQuestions = questions.filter((q: any) => q.required);
     const unansweredRequired = requiredQuestions.filter((q: any) => {
       const questionIndex = questions.indexOf(q);
@@ -336,7 +673,7 @@ const SermonDetail: React.FC = () => {
     });
 
     if (unansweredRequired.length > 0) {
-      toast.error(`Please answer all required questions (${unansweredRequired.length} remaining)`);
+      toast.error(t('exam.requiredQuestions', { count: unansweredRequired.length }));
       return;
     }
 
@@ -345,7 +682,6 @@ const SermonDetail: React.FC = () => {
     try {
       const timeTaken = examStartTime ? Math.floor((Date.now() - examStartTime) / 60000) : 0;
 
-      // Format answers - ensure questionId is properly set
       const formattedAnswers = questions.map((q: any, index: number) => {
         const answer = examAnswers[index];
         
@@ -357,7 +693,6 @@ const SermonDetail: React.FC = () => {
           formattedAnswer = '';
         }
         
-        // CRITICAL: Use question ID if available, otherwise generate one
         let questionId = q.id;
         if (!questionId) {
           questionId = `q_${Date.now()}_${index}`;
@@ -371,9 +706,6 @@ const SermonDetail: React.FC = () => {
         };
       });
 
-      console.log('📤 Submitting exam with answers:', formattedAnswers);
-
-      // Submit to backend database
       const examData = {
         answers: formattedAnswers,
         timeTaken: timeTaken
@@ -384,14 +716,14 @@ const SermonDetail: React.FC = () => {
       setExamSubmitted(true);
       setHasExistingSubmission(true);
       
-      toast.success('Exam submitted successfully! The admin will review your answers.');
+      toast.success(t('exam.submittedSuccess'));
       setShowExam(false);
       
       await refreshExamSubmissions({});
       
     } catch (error: any) {
       console.error('Error submitting exam:', error);
-      toast.error(error.response?.data?.error || 'Failed to submit exam');
+      toast.error(error.response?.data?.error || t('exam.submitError'));
     } finally {
       setIsSubmittingExam(false);
     }
@@ -429,11 +761,11 @@ const SermonDetail: React.FC = () => {
 
   const getQuestionTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      short_answer: 'Short Answer',
-      long_answer: 'Long Answer',
-      checkbox: 'Multiple Choice (Checkbox)',
-      radio: 'Single Choice (Radio)',
-      true_false: 'True / False',
+      short_answer: t('exam.shortAnswer'),
+      long_answer: t('exam.longAnswer'),
+      checkbox: t('exam.multipleChoice'),
+      radio: t('exam.singleChoice'),
+      true_false: t('exam.trueFalse'),
     };
     return labels[type] || type;
   };
@@ -444,7 +776,7 @@ const SermonDetail: React.FC = () => {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <FaSpinner className="animate-spin text-4xl text-cyan-500 mx-auto mb-4" />
-          <p className="text-gray-500">Loading sermon...</p>
+          <p className="text-gray-500">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -457,14 +789,14 @@ const SermonDetail: React.FC = () => {
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <FaTimesCircle className="text-4xl text-red-500" />
           </div>
-          <p className="text-gray-700 font-medium">Failed to load sermon</p>
-          <p className="text-sm text-gray-400 mt-1">{error || 'Sermon not found'}</p>
+          <p className="text-gray-700 font-medium">{t('sermons.loadError')}</p>
+          <p className="text-sm text-gray-400 mt-1">{error || t('sermons.notFound')}</p>
           <button
             onClick={() => navigate('/sermons')}
             className="mt-4 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors flex items-center mx-auto"
           >
             <FaArrowLeft className="mr-2" />
-            Back to Sermons
+            {t('sermons.backToSermons')}
           </button>
         </div>
       </div>
@@ -473,9 +805,9 @@ const SermonDetail: React.FC = () => {
 
   const questions = sermon.questions || [];
   const statusBadge = {
-    published: { label: 'Published', className: 'bg-green-100 text-green-700' },
-    draft: { label: 'Draft', className: 'bg-yellow-100 text-yellow-700' },
-    archived: { label: 'Archived', className: 'bg-gray-100 text-gray-700' },
+    published: { label: t('sermons.published'), className: 'bg-green-100 text-green-700' },
+    draft: { label: t('sermons.draft'), className: 'bg-yellow-100 text-yellow-700' },
+    archived: { label: t('sermons.archived'), className: 'bg-gray-100 text-gray-700' },
   }[sermon.status] || { label: sermon.status, className: 'bg-gray-100 text-gray-700' };
 
   return (
@@ -487,7 +819,7 @@ const SermonDetail: React.FC = () => {
           className="flex items-center space-x-2 text-gray-600 hover:text-cyan-600 transition-colors group"
         >
           <FaArrowLeft className="group-hover:-translate-x-1 transition-transform" />
-          <span>Back</span>
+          <span>{t('common.back')}</span>
         </button>
         <div className="flex items-center space-x-2">
           <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusBadge.className}`}>
@@ -519,7 +851,7 @@ const SermonDetail: React.FC = () => {
                         {sermon.author_name?.charAt(0) || 'A'}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{sermon.author_name || 'Unknown'}</p>
+                        <p className="text-sm font-medium text-gray-900">{sermon.author_name || t('sermons.unknown')}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3 text-xs text-gray-500">
@@ -530,7 +862,7 @@ const SermonDetail: React.FC = () => {
                       {sermon.published_at && (
                         <span className="flex items-center">
                           <FaClock className="mr-1" />
-                          Published: {new Date(sermon.published_at).toLocaleDateString()}
+                          {t('sermons.publishedOn')}: {new Date(sermon.published_at).toLocaleDateString()}
                         </span>
                       )}
                     </div>
@@ -542,7 +874,7 @@ const SermonDetail: React.FC = () => {
                     className={`p-2 rounded-lg transition-colors ${
                       bookmarked ? 'bg-yellow-100 text-yellow-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
-                    title={bookmarked ? 'Bookmarked' : 'Bookmark'}
+                    title={bookmarked ? t('sermons.bookmarked') : t('sermons.bookmark')}
                   >
                     <FaBookmark />
                   </button>
@@ -554,7 +886,7 @@ const SermonDetail: React.FC = () => {
               {/* Scripture */}
               {sermon.scripture && (
                 <div className="mb-6 p-4 bg-cyan-50 rounded-lg border border-cyan-200">
-                  <p className="text-sm font-semibold text-cyan-700">Key Scripture</p>
+                  <p className="text-sm font-semibold text-cyan-700">{t('sermons.keyScripture')}</p>
                   <div className="mt-2">
                     <p className="text-sm text-cyan-600 font-serif italic">
                       "{sermon.scripture}"
@@ -586,50 +918,33 @@ const SermonDetail: React.FC = () => {
                   )}
                   <span>{likeCount}</span>
                 </button>
-                <button className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                
+                <button 
+                  onClick={() => {
+                    document.getElementById('comments-section')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                >
                   <FaComment />
                   <span>{comments.length}</span>
                 </button>
-                <div className="relative">
-                  <button
-                    onClick={() => setShowShareOptions(!showShareOptions)}
-                    className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                  >
-                    <FaShare />
-                    <span>Share</span>
-                  </button>
-                  {showShareOptions && (
-                    <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl p-2 z-50 min-w-[200px] border border-gray-200">
-                      <button onClick={() => handleShare('facebook')} className="flex items-center space-x-2 w-full px-3 py-2 hover:bg-gray-50 rounded-lg transition-colors">
-                        <FaFacebook className="text-blue-600" />
-                        <span>Facebook</span>
-                      </button>
-                      <button onClick={() => handleShare('twitter')} className="flex items-center space-x-2 w-full px-3 py-2 hover:bg-gray-50 rounded-lg transition-colors">
-                        <FaTwitter className="text-blue-400" />
-                        <span>Twitter</span>
-                      </button>
-                      <button onClick={() => handleShare('whatsapp')} className="flex items-center space-x-2 w-full px-3 py-2 hover:bg-gray-50 rounded-lg transition-colors">
-                        <FaWhatsapp className="text-green-500" />
-                        <span>WhatsApp</span>
-                      </button>
-                      <button onClick={() => handleShare('telegram')} className="flex items-center space-x-2 w-full px-3 py-2 hover:bg-gray-50 rounded-lg transition-colors">
-                        <FaTelegram className="text-blue-500" />
-                        <span>Telegram</span>
-                      </button>
-                      <button onClick={() => handleShare('copy')} className="flex items-center space-x-2 w-full px-3 py-2 hover:bg-gray-50 rounded-lg transition-colors">
-                        <FaCopy />
-                        <span>Copy Link</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                
                 <button
-                  onClick={() => setShowQRCode(!showQRCode)}
+                  onClick={() => setShowShareModal(true)}
+                  className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  <FaShare />
+                  <span>{t('sermons.share')}</span>
+                </button>
+                
+                <button
+                  onClick={() => setShowQRModal(true)}
                   className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                 >
                   <FaQrcode />
-                  <span>QR Code</span>
+                  <span>{t('sermons.qrCode')}</span>
                 </button>
+                
                 {!hasJoined ? (
                   <button
                     onClick={handleJoinSermon}
@@ -639,41 +954,22 @@ const SermonDetail: React.FC = () => {
                     {isJoining ? (
                       <>
                         <FaSpinner className="animate-spin" />
-                        <span>Joining...</span>
+                        <span>{t('sermons.joining')}</span>
                       </>
                     ) : (
                       <>
                         <FaUserPlus />
-                        <span>Join Sermon</span>
+                        <span>{t('sermons.joinSermon')}</span>
                       </>
                     )}
                   </button>
                 ) : (
                   <div className="flex items-center space-x-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg border border-green-200">
                     <FaCheckCircle />
-                    <span>Joined</span>
+                    <span>{t('sermons.joined')}</span>
                   </div>
                 )}
               </div>
-
-              {/* QR Code */}
-              {showQRCode && (
-                <div className="mt-4 p-6 bg-white rounded-lg border border-gray-200 flex flex-col items-center">
-                  <QRCodeSVG 
-                    value={window.location.href}
-                    size={180}
-                    level="H"
-                    includeMargin={true}
-                    fgColor="#0e7490"
-                  />
-                  <p className="mt-3 text-sm text-gray-600">
-                    Scan to read this sermon
-                  </p>
-                  <button className="mt-2 text-sm text-cyan-600 hover:text-cyan-700 font-medium">
-                    Download QR Code
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 
@@ -684,25 +980,25 @@ const SermonDetail: React.FC = () => {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <FaBible className="mr-2 text-cyan-500" />
-                    Sermon Exam
+                    {t('exam.title')}
                   </h3>
                   <p className="text-sm text-gray-600">
-                    {hasExistingSubmission ? 'You have already submitted this exam' : 'Test your understanding of this sermon'}
+                    {hasExistingSubmission ? t('exam.alreadySubmitted') : t('exam.testUnderstanding')}
                   </p>
                 </div>
                 {!hasExistingSubmission ? (
                   <button
-                    onClick={toggleExam}
+                    onClick={handleTakeExam}
                     className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all"
                   >
-                    {showExam ? 'Hide Exam' : 'Take Exam'}
+                    {showExam ? t('exam.hideExam') : t('exam.takeExam')}
                   </button>
                 ) : (
                   <button
                     onClick={() => setShowExam(!showExam)}
                     className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors"
                   >
-                    {showExam ? 'Hide Submission' : 'View Submission'}
+                    {showExam ? t('exam.hideSubmission') : t('exam.viewSubmission')}
                   </button>
                 )}
               </div>
@@ -720,10 +1016,10 @@ const SermonDetail: React.FC = () => {
                           {getQuestionTypeIcon(q.type || 'short_answer')}
                           <span className="text-xs text-gray-400">({getQuestionTypeLabel(q.type || 'short_answer')})</span>
                           {q.required && (
-                            <span className="text-xs text-red-500">*Required</span>
+                            <span className="text-xs text-red-500">*{t('exam.required')}</span>
                           )}
                           {q.maxScore && (
-                            <span className="text-xs text-gray-400">Max: {q.maxScore} pts</span>
+                            <span className="text-xs text-gray-400">{t('exam.max')}: {q.maxScore} {t('exam.pts')}</span>
                           )}
                         </div>
                         <p className="font-medium text-gray-900">{q.text}</p>
@@ -733,7 +1029,7 @@ const SermonDetail: React.FC = () => {
                           <input
                             type="text"
                             className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                            placeholder="Type your answer..."
+                            placeholder={t('exam.typeAnswer')}
                             value={currentAnswer as string || ''}
                             onChange={(e) => handleExamAnswerChange(index, e.target.value)}
                           />
@@ -744,7 +1040,7 @@ const SermonDetail: React.FC = () => {
                           <textarea
                             className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                             rows={3}
-                            placeholder="Write your answer..."
+                            placeholder={t('exam.writeAnswer')}
                             value={currentAnswer as string || ''}
                             onChange={(e) => handleExamAnswerChange(index, e.target.value)}
                           />
@@ -798,7 +1094,7 @@ const SermonDetail: React.FC = () => {
                                 onChange={() => handleExamAnswerChange(index, 'true')}
                                 className="text-cyan-600 focus:ring-cyan-500" 
                               />
-                              <span className="text-sm text-gray-700">True</span>
+                              <span className="text-sm text-gray-700">{t('exam.true')}</span>
                             </label>
                             <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                               <input 
@@ -809,7 +1105,7 @@ const SermonDetail: React.FC = () => {
                                 onChange={() => handleExamAnswerChange(index, 'false')}
                                 className="text-cyan-600 focus:ring-cyan-500" 
                               />
-                              <span className="text-sm text-gray-700">False</span>
+                              <span className="text-sm text-gray-700">{t('exam.false')}</span>
                             </label>
                           </div>
                         )}
@@ -825,10 +1121,10 @@ const SermonDetail: React.FC = () => {
                     {isSubmittingExam ? (
                       <>
                         <FaSpinner className="animate-spin mr-2" />
-                        Submitting...
+                        {t('exam.submitting')}
                       </>
                     ) : (
-                      'Submit Exam'
+                      t('exam.submitExam')
                     )}
                   </button>
                 </div>
@@ -840,10 +1136,8 @@ const SermonDetail: React.FC = () => {
                   <div className="flex items-center">
                     <FaCheckCircle className="text-3xl text-green-500 mr-3" />
                     <div>
-                      <h4 className="text-lg font-semibold text-gray-900">Exam Submitted!</h4>
-                      <p className="text-sm text-gray-600">
-                        Your answers have been submitted for review. The admin will grade your exam soon.
-                      </p>
+                      <h4 className="text-lg font-semibold text-gray-900">{t('exam.submitted')}</h4>
+                      <p className="text-sm text-gray-600">{t('exam.submittedMessage')}</p>
                     </div>
                   </div>
                 </div>
@@ -852,10 +1146,10 @@ const SermonDetail: React.FC = () => {
           )}
 
           {/* Comments Section */}
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div id="comments-section" className="bg-white rounded-xl shadow-md p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <FaComment className="mr-2 text-cyan-500" />
-              Comments ({comments.length})
+              {t('sermons.comments')} ({comments.length})
             </h3>
 
             {loadingComments ? (
@@ -871,55 +1165,62 @@ const SermonDetail: React.FC = () => {
                       type="text"
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
-                      placeholder="Share your thoughts..."
+                      placeholder={t('sermons.commentPlaceholder')}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       disabled={isCommenting}
                     />
                     <button 
                       type="submit" 
                       disabled={isCommenting || !comment.trim()}
-                      className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                      className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex items-center"
                     >
-                      {isCommenting ? <FaSpinner className="animate-spin" /> : 'Post'}
+                      {isCommenting ? <FaSpinner className="animate-spin" /> : t('sermons.post')}
                     </button>
                   </form>
                 ) : (
                   <div className="mb-6 p-3 bg-gray-50 rounded-lg text-center text-sm text-gray-600">
-                    Please <Link to="/login" className="text-cyan-600 hover:text-cyan-700 font-medium">login</Link> to comment
+                    {t('sermons.loginToComment')} <Link to="/login" className="text-cyan-600 hover:text-cyan-700 font-medium">{t('auth.login')}</Link>
                   </div>
                 )}
 
                 {/* Comments List */}
-                <div className="space-y-4">
-                  {comments.map((comment) => (
-                    <div key={comment.id} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                      <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-600 font-semibold text-sm">
-                        {comment.user_name?.charAt(0) || 'U'}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium text-gray-900">{comment.user_name || 'Anonymous'}</p>
-                          <span className="text-xs text-gray-500">
-                            {comment.created_at ? new Date(comment.created_at).toLocaleDateString() : 'N/A'}
-                          </span>
+                <div className="space-y-4 max-h-[500px] overflow-y-auto">
+                  {comments.length > 0 ? (
+                    comments.map((comment) => (
+                      <div key={comment.id} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg transition-colors border-b border-gray-100 last:border-0">
+                        <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-600 font-semibold text-sm flex-shrink-0">
+                          {comment.user_name?.charAt(0) || 'U'}
                         </div>
-                        <p className="text-sm text-gray-700 mt-1">{comment.content}</p>
-                        <div className="flex items-center space-x-4 mt-2">
-                          <button 
-                            onClick={() => handleCommentLike(comment.id)}
-                            className={`text-xs transition-colors ${
-                              comment.is_liked ? 'text-red-500' : 'text-gray-500 hover:text-cyan-600'
-                            }`}
-                          >
-                            <FaHeart className="inline mr-1" /> {comment.likes || 0}
-                          </button>
-                          <button className="text-xs text-gray-500 hover:text-cyan-600 transition-colors">
-                            Reply
-                          </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-gray-900">{comment.user_name || t('sermons.anonymous')}</p>
+                            <span className="text-xs text-gray-500">
+                              {comment.created_at ? new Date(comment.created_at).toLocaleDateString() : 'N/A'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 mt-1 break-words">{comment.content}</p>
+                          <div className="flex items-center space-x-4 mt-2">
+                            <button 
+                              onClick={() => handleCommentLike(comment.id)}
+                              className={`text-xs transition-colors ${
+                                comment.is_liked ? 'text-red-500' : 'text-gray-500 hover:text-cyan-600'
+                              }`}
+                            >
+                              <FaHeart className="inline mr-1" /> {comment.likes || 0}
+                            </button>
+                            <button className="text-xs text-gray-500 hover:text-cyan-600 transition-colors">
+                              {t('sermons.reply')}
+                            </button>
+                          </div>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <FaComment className="text-4xl text-gray-300 mx-auto mb-2" />
+                      <p>{t('sermons.noComments')}</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </>
             )}
@@ -933,19 +1234,19 @@ const SermonDetail: React.FC = () => {
             <div className="w-20 h-20 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-white text-3xl font-bold mx-auto">
               {sermon.author_name?.charAt(0) || 'A'}
             </div>
-            <h4 className="mt-3 font-semibold text-gray-900">{sermon.author_name || 'Unknown'}</h4>
+            <h4 className="mt-3 font-semibold text-gray-900">{sermon.author_name || t('sermons.unknown')}</h4>
             <div className="mt-4 flex justify-center space-x-4 text-sm">
               <div>
                 <p className="font-bold text-gray-900">{sermon.likes}</p>
-                <p className="text-xs text-gray-500">Likes</p>
+                <p className="text-xs text-gray-500">{t('sermons.likes')}</p>
               </div>
               <div>
                 <p className="font-bold text-gray-900">{sermon.shares}</p>
-                <p className="text-xs text-gray-500">Shares</p>
+                <p className="text-xs text-gray-500">{t('sermons.shares')}</p>
               </div>
               <div>
                 <p className="font-bold text-gray-900">{sermon.views}</p>
-                <p className="text-xs text-gray-500">Views</p>
+                <p className="text-xs text-gray-500">{t('sermons.views')}</p>
               </div>
             </div>
           </div>
@@ -954,27 +1255,27 @@ const SermonDetail: React.FC = () => {
           <div className="bg-white rounded-xl shadow-md p-6">
             <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
               <FaChartLine className="mr-2 text-cyan-500" />
-              Sermon Stats
+              {t('sermons.stats')}
             </h4>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Views</span>
+                <span className="text-gray-600">{t('sermons.views')}</span>
                 <span className="font-medium text-gray-900">{sermon.views}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Likes</span>
+                <span className="text-gray-600">{t('sermons.likes')}</span>
                 <span className="font-medium text-gray-900">{likeCount}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Shares</span>
+                <span className="text-gray-600">{t('sermons.shares')}</span>
                 <span className="font-medium text-gray-900">{sermon.shares}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Questions</span>
+                <span className="text-gray-600">{t('sermons.questions')}</span>
                 <span className="font-medium text-gray-900">{questions.length}</span>
               </div>
               <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-200">
-                <span className="text-gray-600">Status</span>
+                <span className="text-gray-600">{t('sermons.status')}</span>
                 <span className={`font-medium ${statusBadge.className}`}>{statusBadge.label}</span>
               </div>
             </div>
@@ -984,17 +1285,17 @@ const SermonDetail: React.FC = () => {
           <div className="bg-white rounded-xl shadow-md p-6">
             <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
               <FaUsers className="mr-2 text-cyan-500" />
-              Your Status
+              {t('sermons.yourStatus')}
             </h4>
             {hasJoined ? (
               <div className="p-3 bg-green-50 rounded-lg border border-green-200 text-center">
                 <FaCheckCircle className="text-2xl text-green-500 mx-auto mb-2" />
-                <p className="font-medium text-green-700">You have joined this sermon</p>
-                <p className="text-xs text-green-600 mt-1">You can access all materials</p>
+                <p className="font-medium text-green-700">{t('sermons.hasJoined')}</p>
+                <p className="text-xs text-green-600 mt-1">{t('sermons.accessMaterials')}</p>
               </div>
             ) : (
               <div className="p-3 bg-gray-50 rounded-lg text-center">
-                <p className="text-sm text-gray-600">Not joined yet</p>
+                <p className="text-sm text-gray-600">{t('sermons.notJoined')}</p>
                 <button
                   onClick={handleJoinSermon}
                   disabled={isJoining}
@@ -1003,12 +1304,12 @@ const SermonDetail: React.FC = () => {
                   {isJoining ? (
                     <>
                       <FaSpinner className="animate-spin mr-2" />
-                      Joining...
+                      {t('sermons.joining')}
                     </>
                   ) : (
                     <>
                       <FaUserPlus className="mr-2" />
-                      Join Now
+                      {t('sermons.joinNow')}
                     </>
                   )}
                 </button>
@@ -1021,26 +1322,26 @@ const SermonDetail: React.FC = () => {
             <div className="bg-white rounded-xl shadow-md p-6">
               <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
                 <FaBible className="mr-2 text-cyan-500" />
-                Exam Status
+                {t('exam.status')}
               </h4>
               {hasExistingSubmission ? (
                 <div className="p-3 bg-green-50 rounded-lg border border-green-200 text-center">
                   <FaCheckCircle className="text-2xl text-green-500 mx-auto mb-2" />
-                  <p className="font-medium text-green-700">Exam Submitted</p>
-                  <p className="text-xs text-green-600 mt-1">Waiting for review</p>
+                  <p className="font-medium text-green-700">{t('exam.submitted')}</p>
+                  <p className="text-xs text-green-600 mt-1">{t('exam.waitingReview')}</p>
                 </div>
               ) : (
                 <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200 text-center">
                   <FaExclamationTriangle className="text-2xl text-yellow-500 mx-auto mb-2" />
-                  <p className="font-medium text-yellow-700">Not Submitted</p>
+                  <p className="font-medium text-yellow-700">{t('exam.notSubmitted')}</p>
                   <p className="text-xs text-yellow-600 mt-1">
-                    {questions.length} question{questions.length > 1 ? 's' : ''} to answer
+                    {questions.length} {t('exam.questionsToAnswer')}
                   </p>
                   <button
-                    onClick={toggleExam}
+                    onClick={handleTakeExam}
                     className="mt-2 w-full py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all"
                   >
-                    Take Exam Now
+                    {t('exam.takeExamNow')}
                   </button>
                 </div>
               )}
@@ -1048,6 +1349,49 @@ const SermonDetail: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Login Required Modal */}
+      <LoginRequiredModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLogin={() => {
+          setShowLoginModal(false);
+          navigate('/login', { state: { from: window.location.pathname } });
+        }}
+        onRegister={() => {
+          setShowLoginModal(false);
+          navigate('/join');
+        }}
+        action={loginAction}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        sermonTitle={sermon.title}
+        sermonUrl={window.location.href}
+        onShare={handleShare}
+      />
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        isOpen={showQRModal}
+        onClose={() => setShowQRModal(false)}
+        url={window.location.href}
+        title={sermon.title}
+      />
+
+      {/* Animation Styles */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

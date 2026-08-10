@@ -1,17 +1,17 @@
 // src/components/Header.tsx
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/context/AuthContext';
+import LanguageSwitcher from './LanguageSwitcher';
 import { 
   RiLoginBoxLine, 
   RiHomeLine,
-  
   RiUserLine,
   RiLogoutBoxLine,
   RiBookLine,
   RiAwardLine,
   RiBarChartLine,
-  
   RiFileListLine,
   RiAdminLine,
   RiShieldUserLine,
@@ -42,6 +42,7 @@ interface MenuItem {
 // ============================================
 
 const Header: React.FC = () => {
+  const { t } = useTranslation();
   const { user, logout, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -70,7 +71,7 @@ const Header: React.FC = () => {
   const handleLogout = async (): Promise<void> => {
     await logout();
     navigate('/login');
-    toast.success('Logged out successfully');
+    toast.success(t('auth.logoutSuccess'));
   };
 
   // ============================================
@@ -80,69 +81,67 @@ const Header: React.FC = () => {
   const getNavItems = (): NavItem[] => {
     const role = user?.role || 'student';
     
-    // Common items for all authenticated users
     const commonItems: NavItem[] = [
       { 
         to: '/dashboard', 
-        label: 'Home', 
+        label: t('nav.home'), 
         icon: <RiHomeLine className="text-lg" /> 
       },
       { 
         to: '/sermons', 
-        label: 'Sermons', 
+        label: t('nav.sermons'), 
         icon: <RiBookLine className="text-lg" /> 
       },
       { 
         to: '/certificates', 
-        label: 'Certificates', 
+        label: t('nav.certificates'), 
         icon: <RiAwardLine className="text-lg" /> 
       },
       { 
         to: '/profile', 
-        label: 'Profile', 
+        label: t('nav.profile'), 
         icon: <RiUserLine className="text-lg" /> 
       },
     ];
     
-    // Role-specific items
     const roleItems: Record<string, NavItem[]> = {
       admin: [
         { 
           to: '/admin', 
-          label: 'Admin', 
+          label: t('nav.admin'), 
           icon: <RiAdminLine className="text-lg" /> 
         },
       ],
       evangelist: [
         { 
           to: '/ev/dashboard', 
-          label: 'Evangelist', 
+          label: t('nav.evangelist'), 
           icon: <RiBarChartLine className="text-lg" /> 
         },
         { 
           to: '/evangelist/exams', 
-          label: 'Exams', 
+          label: t('nav.exams'), 
           icon: <RiFileListLine className="text-lg" /> 
         },
       ],
       student: [
         { 
           to: '/student/exams', 
-          label: 'My Exams', 
+          label: t('nav.myExams'), 
           icon: <RiFileListLine className="text-lg" /> 
         },
       ],
       church_admin: [
         { 
           to: '/admin', 
-          label: 'Church Admin', 
+          label: t('nav.churchAdmin'), 
           icon: <RiAdminLine className="text-lg" /> 
         },
       ],
       super_admin: [
         { 
           to: '/admin', 
-          label: 'Super Admin', 
+          label: t('nav.superAdmin'), 
           icon: <RiShieldUserLine className="text-lg" /> 
         },
       ],
@@ -169,16 +168,16 @@ const Header: React.FC = () => {
   // ============================================
 
   const mainMenu: MenuItem[] = [
-    { label: 'About digital evangelism', path: '/about' },
-    { label: 'Discover', path: '/#' },
-    { label: 'Activities', path: '/activities' },
-    { label: 'Accommodation', path: '/accommodation' },
+    { label: t('nav.about'), path: '/about' },
+    { label: t('nav.discover'), path: '/#' },
+    { label: t('nav.activities'), path: '/activities' },
+    { label: t('nav.accommodation'), path: '/accommodation' },
   ];
 
   const topMenu: MenuItem[] = [
-    { label: 'Gallery', path: '/gallery' },
-    { label: 'Preach Digitally', path: '/news' },
-    { label: 'Contact Us', path: '/contact' },
+    { label: t('nav.gallery'), path: '/gallery' },
+    { label: t('nav.news'), path: '/news' },
+    { label: t('nav.contact'), path: '/contact' },
   ];
 
   const currentDate: string = new Date().toLocaleDateString('en-US', { 
@@ -201,7 +200,7 @@ const Header: React.FC = () => {
             <Link to="/dashboard" className="flex-shrink-0">
               <img
                 src={aptecLogo}
-                alt="Digital Evangelism Logo"
+                alt={t('common.appName')}
                 className="h-[50px] w-auto object-contain"
               />
             </Link>
@@ -219,6 +218,8 @@ const Header: React.FC = () => {
                 </Link>
               ))}
               
+              <LanguageSwitcher />
+              
               {/* Logout Button */}
               <button
                 onClick={handleLogout}
@@ -230,7 +231,7 @@ const Header: React.FC = () => {
                 ) : (
                   <RiLogoutBoxLine className="text-lg" />
                 )}
-                {authLoading ? 'Logging out...' : 'Logout'}
+                {authLoading ? t('common.loading') : t('nav.logout')}
               </button>
             </div>
 
@@ -283,6 +284,9 @@ const Header: React.FC = () => {
                     {item.label}
                   </Link>
                 ))}
+                <div className="px-4 py-2">
+                  <LanguageSwitcher />
+                </div>
                 <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
@@ -291,7 +295,7 @@ const Header: React.FC = () => {
                   className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 >
                   <RiLogoutBoxLine className="text-lg" />
-                  Logout
+                  {t('nav.logout')}
                 </button>
               </div>
             </div>
@@ -313,20 +317,23 @@ const Header: React.FC = () => {
           <span className="text-gray-400 text-sm">
             {currentDate}
           </span>
-          <div className="hidden md:flex gap-6">
-            {topMenu.map((item: MenuItem) => (
-              <NavLink
-                key={item.label}
-                to={item.path}
-                className={({ isActive }) =>
-                  `text-gray-400 text-sm hover:text-white transition-colors ${
-                    isActive ? 'text-white' : ''
-                  }`
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex gap-6">
+              {topMenu.map((item: MenuItem) => (
+                <NavLink
+                  key={item.label}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `text-gray-400 text-sm hover:text-white transition-colors ${
+                      isActive ? 'text-white' : ''
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+            <LanguageSwitcher />
           </div>
         </div>
       </nav>
@@ -338,7 +345,7 @@ const Header: React.FC = () => {
           <Link to="/" className="flex-shrink-0">
             <img
               src={aptecLogo}
-              alt="Digital Evangelism Logo"
+              alt={t('common.appName')}
               className="h-[60px] w-auto object-contain"
             />
           </Link>
@@ -367,14 +374,14 @@ const Header: React.FC = () => {
               className="inline-block bg-[#0e5488] text-white px-4 py-2 rounded hover:bg-[#002256] transition-colors text-sm font-semibold flex items-center gap-2"
             >
               <RiLoginBoxLine />
-              Login
+              {t('nav.login')}
             </Link>
             <Link 
               to="/join" 
               className="inline-block bg-[#0e5488] text-white px-4 py-2 rounded hover:bg-[#002256] transition-colors text-sm font-semibold flex items-center gap-2"
             >
               <CrossIcon />
-              Join Our Ministry
+              {t('nav.register')}
             </Link>
           </div>
 
@@ -414,7 +421,7 @@ const Header: React.FC = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <RiLoginBoxLine />
-                Login
+                {t('nav.login')}
               </Link>
               <Link 
                 to="/join" 
@@ -422,8 +429,11 @@ const Header: React.FC = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <CrossIcon />
-                Join Our Ministry
+                {t('nav.register')}
               </Link>
+              <div className="px-2 py-2">
+                <LanguageSwitcher />
+              </div>
               {topMenu.map((item: MenuItem) => (
                 <NavLink
                   key={item.label}

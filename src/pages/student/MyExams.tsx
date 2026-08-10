@@ -1,6 +1,7 @@
 // src/pages/student/MyExams.tsx
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   FaBook, FaCheckCircle, FaClock, 
   FaExclamationCircle, FaEye, FaSearch,
@@ -69,6 +70,7 @@ interface ExamFilter {
 // ===================== MAIN COMPONENT =====================
 
 const MyExams: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { examSubmissions, loadingExams, examError, refreshExamSubmissions } = useAdmin();
@@ -170,7 +172,6 @@ const MyExams: React.FC = () => {
     return 0;
   };
 
-  // ========== FIXED: PASS/FAIL LOGIC ==========
   const isExamPassed = (exam: ExamAttempt): boolean => {
     if (exam.status === 'pending') return false;
     if (exam.is_passed) return true;
@@ -179,14 +180,13 @@ const MyExams: React.FC = () => {
     return false;
   };
 
-  // ========== FIXED: getStatusLabel ==========
   const getStatusLabel = (exam: ExamAttempt): string => {
-    if (exam.status === 'pending') return 'Pending';
-    if (exam.status === 'reviewed') return 'Reviewed';
+    if (exam.status === 'pending') return t('exam.pending');
+    if (exam.status === 'reviewed') return t('exam.reviewed');
     if (exam.status === 'graded') {
-      return isExamPassed(exam) ? 'Passed' : 'Failed';
+      return isExamPassed(exam) ? t('exam.passed') : t('exam.failed');
     }
-    return 'Unknown';
+    return t('exam.unknown');
   };
 
   const getStatusBadge = (exam: ExamAttempt) => {
@@ -234,12 +234,12 @@ const MyExams: React.FC = () => {
   };
 
   const getGradeLabel = (percentage: number) => {
-    if (percentage >= 80) return 'Excellent';
-    if (percentage >= 70) return 'Very Good';
-    if (percentage >= 60) return 'Good';
-    if (percentage >= 50) return 'Satisfactory';
-    if (percentage >= 30) return 'Pass';
-    return 'Needs Improvement';
+    if (percentage >= 80) return t('exam.excellent');
+    if (percentage >= 70) return t('exam.veryGood');
+    if (percentage >= 60) return t('exam.good');
+    if (percentage >= 50) return t('exam.satisfactory');
+    if (percentage >= 30) return t('exam.pass');
+    return t('exam.needsImprovement');
   };
 
   const renderStars = (percentage: number) => {
@@ -266,16 +266,16 @@ const MyExams: React.FC = () => {
   };
 
   const handleRetakeExam = (sermonId: number) => {
-    toast.success('Redirecting to exam...');
+    toast.success(t('exam.redirecting'));
     navigate(`/sermons/${sermonId}`);
   };
 
   const handleShare = (exam: ExamAttempt) => {
     const url = `${window.location.origin}/sermons/${exam.sermon}`;
     navigator.clipboard.writeText(url).then(() => {
-      toast.success('Sermon link copied to clipboard!');
+      toast.success(t('exam.linkCopied'));
     }).catch(() => {
-      toast.success(`Share this sermon: ${url}`);
+      toast.success(`${t('exam.shareLink')}: ${url}`);
     });
   };
 
@@ -283,7 +283,7 @@ const MyExams: React.FC = () => {
     setIsRefreshing(true);
     try {
       await refreshExamSubmissions();
-      toast.success('Refreshed!');
+      toast.success(t('common.refresh'));
     } catch (error) {
       console.error('Refresh error:', error);
     } finally {
@@ -294,10 +294,10 @@ const MyExams: React.FC = () => {
   // ========== LOADING STATE ==========
   if (loadingExams) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-white-50 to-white-50 flex items-center justify-center">
         <div className="text-center">
           <FaSpinner className="animate-spin text-5xl text-cyan-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading your exams...</p>
+          <p className="text-gray-600">{t('exam.loading')}</p>
         </div>
       </div>
     );
@@ -311,14 +311,14 @@ const MyExams: React.FC = () => {
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <FaExclamationCircle className="text-4xl text-red-500" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Exams</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('exam.loadError')}</h2>
           <p className="text-gray-600 mb-6">{examError}</p>
           <button
             onClick={handleRefresh}
             className="px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors inline-flex items-center"
           >
             <FaSpinner className={`animate-spin mr-2 ${!isRefreshing ? 'hidden' : ''}`} />
-            Try Again
+            {t('common.retry')}
           </button>
         </div>
       </div>
@@ -340,9 +340,9 @@ const MyExams: React.FC = () => {
             </button>
             <div>
               <h1 className="text-3xl font-serif font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-                My Exams
+                {t('exam.title')}
               </h1>
-              <p className="text-sm text-gray-600">View all your attempted sermons and exams</p>
+              <p className="text-sm text-gray-600">{t('exam.subtitle')}</p>
             </div>
           </div>
           <button
@@ -350,7 +350,7 @@ const MyExams: React.FC = () => {
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center space-x-2"
           >
             <FaSpinner className={isRefreshing ? 'animate-spin' : ''} />
-            <span>Refresh</span>
+            <span>{t('common.refresh')}</span>
           </button>
         </div>
 
@@ -358,27 +358,27 @@ const MyExams: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-cyan-500">
             <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-            <p className="text-xs text-gray-500">Total Exams</p>
+            <p className="text-xs text-gray-500">{t('exam.totalExams')}</p>
           </div>
           <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-yellow-500">
             <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-            <p className="text-xs text-gray-500">Pending</p>
+            <p className="text-xs text-gray-500">{t('exam.pending')}</p>
           </div>
           <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-green-500">
             <p className="text-2xl font-bold text-green-600">{stats.graded}</p>
-            <p className="text-xs text-gray-500">Graded</p>
+            <p className="text-xs text-gray-500">{t('exam.graded')}</p>
           </div>
           <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-blue-500">
             <p className="text-2xl font-bold text-blue-600">{stats.reviewed}</p>
-            <p className="text-xs text-gray-500">Reviewed</p>
+            <p className="text-xs text-gray-500">{t('exam.reviewed')}</p>
           </div>
           <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-red-500">
             <p className="text-2xl font-bold text-red-600">{stats.failed}</p>
-            <p className="text-xs text-gray-500">Failed</p>
+            <p className="text-xs text-gray-500">{t('exam.failed')}</p>
           </div>
           <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-purple-500">
             <p className="text-2xl font-bold text-purple-600">{stats.averageScore.toFixed(1)}%</p>
-            <p className="text-xs text-gray-500">Avg Score</p>
+            <p className="text-xs text-gray-500">{t('exam.avgScore')}</p>
           </div>
         </div>
 
@@ -391,7 +391,7 @@ const MyExams: React.FC = () => {
               </div>
               <input
                 type="text"
-                placeholder="Search by sermon title or topic..."
+                placeholder={t('exam.searchPlaceholder')}
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 value={filter.search}
                 onChange={(e) => setFilter({ ...filter, search: e.target.value })}
@@ -403,21 +403,21 @@ const MyExams: React.FC = () => {
                 value={filter.status}
                 onChange={(e) => setFilter({ ...filter, status: e.target.value as any })}
               >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="graded">Graded</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="passed">Passed</option>
-                <option value="failed">Failed</option>
+                <option value="all">{t('exam.allStatus')}</option>
+                <option value="pending">{t('exam.pending')}</option>
+                <option value="graded">{t('exam.graded')}</option>
+                <option value="reviewed">{t('exam.reviewed')}</option>
+                <option value="passed">{t('exam.passed')}</option>
+                <option value="failed">{t('exam.failed')}</option>
               </select>
               <select
                 className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white"
                 value={filter.sortBy}
                 onChange={(e) => setFilter({ ...filter, sortBy: e.target.value as any })}
               >
-                <option value="date">Sort by Date</option>
-                <option value="score">Sort by Score</option>
-                <option value="title">Sort by Title</option>
+                <option value="date">{t('exam.sortByDate')}</option>
+                <option value="score">{t('exam.sortByScore')}</option>
+                <option value="title">{t('exam.sortByTitle')}</option>
               </select>
               <button
                 onClick={() => setFilter({ ...filter, sortOrder: filter.sortOrder === 'asc' ? 'desc' : 'asc' })}
@@ -448,7 +448,7 @@ const MyExams: React.FC = () => {
                           <FaBook className="text-cyan-500 text-lg" />
                           <h3 className="font-semibold text-gray-900 line-clamp-1">{exam.sermon_title}</h3>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Topic: {exam.sermon_topic || 'General'}</p>
+                        <p className="text-xs text-gray-500 mt-1">{t('exam.topic')}: {exam.sermon_topic || t('exam.general')}</p>
                       </div>
                       <span className={`inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-medium rounded-full ${getStatusBadge(exam)}`}>
                         {getStatusIcon(exam)}
@@ -462,17 +462,17 @@ const MyExams: React.FC = () => {
                     {/* Score */}
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-600">Score</p>
+                        <p className="text-sm text-gray-600">{t('exam.score')}</p>
                         {exam.status !== 'pending' ? (
                           <p className={`text-xl font-bold ${getGradeColor(percentage)}`}>
                             {percentage.toFixed(1)}%
                           </p>
                         ) : (
-                          <p className="text-sm text-yellow-600 font-medium">Awaiting Grading</p>
+                          <p className="text-sm text-yellow-600 font-medium">{t('exam.awaitingGrading')}</p>
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-gray-600">Grade</p>
+                        <p className="text-sm text-gray-600">{t('exam.grade')}</p>
                         {exam.status !== 'pending' ? (
                           <p className="text-sm font-semibold text-gray-800">
                             {getGradeLabel(percentage)}
@@ -500,7 +500,7 @@ const MyExams: React.FC = () => {
                         {new Date(exam.submitted_at).toLocaleDateString()}
                       </span>
                       {exam.time_taken > 0 && (
-                        <span>{exam.time_taken} min</span>
+                        <span>{exam.time_taken} {t('exam.min')}</span>
                       )}
                     </div>
 
@@ -511,7 +511,7 @@ const MyExams: React.FC = () => {
                         className="flex-1 flex items-center justify-center px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-600 rounded-lg text-sm font-medium transition-colors"
                       >
                         <FaEye className="mr-1" />
-                        View
+                        {t('exam.view')}
                       </button>
                       {exam.status === 'graded' && !passed && (
                         <button
@@ -519,13 +519,13 @@ const MyExams: React.FC = () => {
                           className="flex-1 flex items-center justify-center px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg text-sm font-medium transition-colors"
                         >
                           <FaCheckCircle className="mr-1" />
-                          Retake
+                          {t('exam.retake')}
                         </button>
                       )}
                       <button
                         onClick={() => handleShare(exam)}
                         className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-lg text-sm font-medium transition-colors"
-                        title="Share Sermon"
+                        title={t('exam.shareSermon')}
                       >
                         <FaShare />
                       </button>
@@ -541,68 +541,66 @@ const MyExams: React.FC = () => {
             <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <FaBook className="text-4xl text-cyan-400" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Exams Found</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('exam.noExams')}</h3>
             <p className="text-gray-500">
-              {filter.search ? 'Try adjusting your search or filters' : 'You haven\'t attempted any exams yet'}
+              {filter.search ? t('exam.adjustSearch') : t('exam.noExamsMessage')}
             </p>
             {!filter.search && (
               <Link to="/sermons" className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium">
                 <FaBook className="mr-2" />
-                Browse Sermons
+                {t('exam.browseSermons')}
               </Link>
             )}
           </div>
         )}
 
-        {/* Exam Details Modal */}
+        {/* Exam Details Modal - Keep as is but translate labels */}
         {showDetailsModal && selectedExam && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
             <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
               <div className="sticky top-0 bg-gradient-to-r from-white-600 to-white-600 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
                 <div className="flex items-center space-x-3">
-                  <FaBook className="text-white text-xl" />
+                  <FaBook className="text-dark text-xl" />
                   <div>
                     <h3 className="text-dark font-bold text-lg">{selectedExam.sermon_title}</h3>
-                    <p className="text-dark-100 text-sm">Exam Results</p>
+                    <p className="text-dark-100 text-sm">{t('exam.examResults')}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowDetailsModal(false)}
-                  className="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/20 rounded-lg"
+                  className="text-dark/80 hover:text-gray transition-colors p-2 hover:bg-white/20 rounded-lg"
                 >
                   <FaTimes />
                 </button>
               </div>
 
-              {/* Content */}
               <div className="p-6 space-y-6">
                 {/* Summary */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-sm text-gray-600">Status</p>
+                    <p className="text-sm text-gray-600">{t('exam.status')}</p>
                     <span className={`inline-flex items-center space-x-1 px-2.5 py-1 text-sm font-medium rounded-full ${getStatusBadge(selectedExam)}`}>
                       {getStatusIcon(selectedExam)}
                       <span>{getStatusLabel(selectedExam)}</span>
                     </span>
                   </div>
                   <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
-                    <p className="text-sm text-gray-600">Score</p>
+                    <p className="text-sm text-gray-600">{t('exam.score')}</p>
                     {selectedExam.status !== 'pending' ? (
                       <p className={`text-xl font-bold ${getGradeColor(selectedExam.percentage || 0)}`}>
                         {(selectedExam.percentage || 0).toFixed(1)}%
                       </p>
                     ) : (
-                      <p className="text-sm text-yellow-600">Pending</p>
+                      <p className="text-sm text-yellow-600">{t('exam.pending')}</p>
                     )}
                   </div>
                   <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
-                    <p className="text-sm text-gray-600">Questions</p>
+                    <p className="text-sm text-gray-600">{t('exam.questions')}</p>
                     <p className="text-xl font-bold text-gray-900">{selectedExam.questions?.length || 0}</p>
                   </div>
                   <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
-                    <p className="text-sm text-gray-600">Duration</p>
-                    <p className="text-xl font-bold text-gray-900">{selectedExam.time_taken || 0} min</p>
+                    <p className="text-sm text-gray-600">{t('exam.duration')}</p>
+                    <p className="text-xl font-bold text-gray-900">{selectedExam.time_taken || 0} {t('exam.min')}</p>
                   </div>
                 </div>
 
@@ -623,14 +621,14 @@ const MyExams: React.FC = () => {
                         <h4 className={`text-lg font-bold ${
                           isExamPassed(selectedExam) ? 'text-green-700' : 'text-red-700'
                         }`}>
-                          {isExamPassed(selectedExam) ? 'Passed' : 'Failed'}
+                          {isExamPassed(selectedExam) ? t('exam.passed') : t('exam.failed')}
                         </h4>
                         <p className={`text-sm ${
                           isExamPassed(selectedExam) ? 'text-green-600' : 'text-red-600'
                         }`}>
                           {isExamPassed(selectedExam) 
-                            ? `Congratulations! You scored ${selectedExam.percentage?.toFixed(1)}% which is above the passing mark.`
-                            : `You scored ${selectedExam.percentage?.toFixed(1)}%. The passing mark is 30%.`
+                            ? t('exam.passMessage', { percentage: selectedExam.percentage?.toFixed(1) })
+                            : t('exam.failMessage', { percentage: selectedExam.percentage?.toFixed(1) })
                           }
                         </p>
                       </div>
@@ -641,11 +639,11 @@ const MyExams: React.FC = () => {
                 {/* Feedback */}
                 {selectedExam.feedback && (
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-1">Feedback</h4>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-1">{t('exam.feedback')}</h4>
                     <p className="text-sm text-gray-700">{selectedExam.feedback}</p>
                     {selectedExam.graded_at && (
                       <p className="text-xs text-gray-400 mt-2">
-                        Graded by {selectedExam.graded_by_name || 'Unknown'} on {new Date(selectedExam.graded_at).toLocaleDateString()}
+                        {t('exam.gradedBy')} {selectedExam.graded_by_name || t('exam.unknown')} {t('exam.on')} {new Date(selectedExam.graded_at).toLocaleDateString()}
                       </p>
                     )}
                   </div>
@@ -653,7 +651,7 @@ const MyExams: React.FC = () => {
 
                 {/* Questions and Answers */}
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Questions & Answers</h4>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('exam.questionsAndAnswers')}</h4>
                   <div className="space-y-4">
                     {(selectedExam.questions || []).map((question: any, index: number) => {
                       const answer = (selectedExam.answers || []).find((a: any) => a.questionId === question.id);
@@ -666,18 +664,18 @@ const MyExams: React.FC = () => {
                                 <span className="text-xs font-medium text-gray-500">Q{index + 1}</span>
                                 <span className="text-xs text-gray-400">({question.type?.replace('_', ' ') || 'short_answer'})</span>
                                 {question.required && (
-                                  <span className="text-xs text-red-500">*Required</span>
+                                  <span className="text-xs text-red-500">*{t('exam.required')}</span>
                                 )}
                                 {question.maxScore && question.maxScore > 0 && (
                                   <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                                    Max: {question.maxScore} pts
+                                    {t('exam.max')}: {question.maxScore} {t('exam.pts')}
                                   </span>
                                 )}
                               </div>
                               <p className="text-sm font-medium text-gray-900">{question.text}</p>
                               
                               <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                <p className="text-xs text-gray-500 mb-1">Your Answer:</p>
+                                <p className="text-xs text-gray-500 mb-1">{t('exam.yourAnswer')}:</p>
                                 {Array.isArray(answer?.answer) ? (
                                   <ul className="list-disc list-inside text-sm text-gray-700">
                                     {(answer?.answer as string[]).map((item: string, i: number) => (
@@ -685,14 +683,14 @@ const MyExams: React.FC = () => {
                                     ))}
                                   </ul>
                                 ) : (
-                                  <p className="text-sm text-gray-700">{answer?.answer || 'No answer provided'}</p>
+                                  <p className="text-sm text-gray-700">{answer?.answer || t('exam.noAnswer')}</p>
                                 )}
                               </div>
 
                               {selectedExam.status !== 'pending' && (
                                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
                                   <div>
-                                    <span className="text-sm text-gray-600">Score: </span>
+                                    <span className="text-sm text-gray-600">{t('exam.score')}: </span>
                                     <span className={`font-bold ${
                                       (answer?.score || 0) === (answer?.maxScore || 0) 
                                         ? 'text-green-600' 
@@ -705,7 +703,7 @@ const MyExams: React.FC = () => {
                                   </div>
                                   {answer?.feedback && (
                                     <div className="text-sm text-gray-600">
-                                      <span className="font-medium">Feedback:</span> {answer.feedback}
+                                      <span className="font-medium">{t('exam.feedback')}:</span> {answer.feedback}
                                     </div>
                                   )}
                                 </div>
@@ -729,7 +727,7 @@ const MyExams: React.FC = () => {
                       className="flex-1 flex items-center justify-center px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all"
                     >
                       <FaCheckCircle className="mr-2" />
-                      Retake Exam
+                      {t('exam.retakeExam')}
                     </button>
                   )}
                   <button
@@ -737,13 +735,13 @@ const MyExams: React.FC = () => {
                     className="flex-1 flex items-center justify-center px-6 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all"
                   >
                     <FaShare className="mr-2" />
-                    Share Sermon
+                    {t('exam.shareSermon')}
                   </button>
                   <button
                     onClick={() => setShowDetailsModal(false)}
                     className="px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                   >
-                    Close
+                    {t('common.close')}
                   </button>
                 </div>
               </div>

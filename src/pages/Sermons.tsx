@@ -1,6 +1,7 @@
 // src/pages/Sermons.tsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   FaSearch, FaFilter, FaPlus, FaEye, FaHeart, 
   FaComment, FaShare, FaSpinner, FaTimesCircle,
@@ -11,6 +12,7 @@ import type { Sermon } from '../types/data';
 import toast from 'react-hot-toast';
 
 const Sermons: React.FC = () => {
+  const { t } = useTranslation();
   const { sermons, loadingSermons, sermonError, refreshAllSermons } = useAdmin();
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
@@ -70,14 +72,14 @@ const Sermons: React.FC = () => {
           newSet.delete(sermonId);
           return newSet;
         });
-        toast.success('Unliked sermon');
+        toast.success(t('sermons.unliked'));
       } else {
         setLikedSermons(prev => new Set(prev).add(sermonId));
-        toast.success('Liked sermon!');
+        toast.success(t('sermons.liked'));
       }
     } catch (error: any) {
       console.error('Error toggling like:', error);
-      toast.error('Failed to like sermon');
+      toast.error(t('sermons.likeError'));
     } finally {
       setIsLiking(null);
     }
@@ -91,9 +93,9 @@ const Sermons: React.FC = () => {
     const url = `${window.location.origin}/sermons/${sermonId}`;
     try {
       await navigator.clipboard.writeText(url);
-      toast.success('Link copied to clipboard!');
+      toast.success(t('sermons.linkCopied'));
     } catch (error) {
-      toast.error('Failed to copy link');
+      toast.error(t('sermons.copyError'));
     }
   };
 
@@ -103,7 +105,7 @@ const Sermons: React.FC = () => {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <FaSpinner className="animate-spin text-4xl text-cyan-500 mx-auto mb-4" />
-          <p className="text-gray-500">Loading sermons...</p>
+          <p className="text-gray-500">{t('sermons.loading')}</p>
         </div>
       </div>
     );
@@ -116,14 +118,14 @@ const Sermons: React.FC = () => {
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <FaTimesCircle className="text-4xl text-red-500" />
           </div>
-          <p className="text-gray-700 font-medium">Failed to load sermons</p>
+          <p className="text-gray-700 font-medium">{t('sermons.loadError')}</p>
           <p className="text-sm text-gray-400 mt-1">{sermonError}</p>
           <button
             onClick={() => refreshAllSermons()}
             className="mt-4 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors flex items-center mx-auto"
           >
             <FaSpinner className="mr-2" />
-            Retry
+            {t('common.retry')}
           </button>
         </div>
       </div>
@@ -135,16 +137,19 @@ const Sermons: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-gray-900">Sermons</h1>
-          <p className="mt-1 text-gray-600">Browse and study sermons from around the world</p>
+          <h1 className="text-3xl font-serif font-bold text-gray-900">{t('nav.sermons')}</h1>
+          <p className="mt-1 text-gray-600">{t('sermons.subtitle')}</p>
           <p className="text-sm text-gray-500 mt-1">
-            {sermons.length} sermons available
+            {t('sermons.availableCount', { count: sermons.length })}
           </p>
         </div>
-        <button className="flex items-center space-x-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all">
+        <Link 
+          to="/admin/create-sermon"
+          className="flex items-center space-x-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all"
+        >
           <FaPlus />
-          <span>Share Sermon</span>
-        </button>
+          <span>{t('sermons.shareSermon')}</span>
+        </Link>
       </div>
 
       {/* Search and Filter */}
@@ -155,7 +160,7 @@ const Sermons: React.FC = () => {
           </div>
           <input
             type="text"
-            placeholder="Search sermons by title, topic or author..."
+            placeholder={t('sermons.searchPlaceholder')}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -167,12 +172,12 @@ const Sermons: React.FC = () => {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           >
-            <option value="all">All Sermons</option>
-            <option value="published">Published</option>
-            <option value="draft">Drafts</option>
-            <option value="archived">Archived</option>
-            <option value="recent">Most Recent</option>
-            <option value="popular">Most Popular</option>
+            <option value="all">{t('sermons.allSermons')}</option>
+            <option value="published">{t('sermons.published')}</option>
+            <option value="draft">{t('sermons.drafts')}</option>
+            <option value="archived">{t('sermons.archived')}</option>
+            <option value="recent">{t('sermons.mostRecent')}</option>
+            <option value="popular">{t('sermons.mostPopular')}</option>
           </select>
           <button className="p-2.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
             <FaFilter className="text-gray-600" />
@@ -198,7 +203,9 @@ const Sermons: React.FC = () => {
                         ? 'bg-yellow-100 text-yellow-700'
                         : 'bg-gray-100 text-gray-700'
                     }`}>
-                      {sermon.status || 'Draft'}
+                      {sermon.status === 'published' ? t('sermons.published') : 
+                       sermon.status === 'draft' ? t('sermons.draft') : 
+                       t('sermons.archived')}
                     </span>
                     <span className="text-xs text-gray-400 flex items-center">
                       <FaEye className="mr-1" />
@@ -221,7 +228,7 @@ const Sermons: React.FC = () => {
                   <div className="flex items-center justify-between mt-3">
                     <span className="text-sm text-gray-600 flex items-center">
                       <FaUser className="mr-1 text-gray-400" />
-                      {sermon.author_name || 'Unknown'}
+                      {sermon.author_name || t('sermons.unknown')}
                     </span>
                     <span className="text-xs text-gray-500 flex items-center">
                       <FaCalendar className="mr-1 text-gray-400" />
@@ -282,7 +289,7 @@ const Sermons: React.FC = () => {
                       to={`/sermons/${sermon.id}`}
                       className="text-sm text-cyan-600 hover:text-cyan-700 font-medium flex items-center"
                     >
-                      Read More
+                      {t('sermons.readMore')}
                       <FaArrowRight className="ml-1 text-xs" />
                     </Link>
                   </div>
@@ -296,16 +303,16 @@ const Sermons: React.FC = () => {
           <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <FaBook className="text-4xl text-cyan-400" />
           </div>
-          <p className="text-gray-500 font-medium">No sermons found</p>
+          <p className="text-gray-500 font-medium">{t('sermons.noSermonsFound')}</p>
           <p className="text-sm text-gray-400 mt-1">
-            {searchTerm ? 'Try adjusting your search or filter' : 'No sermons available yet'}
+            {searchTerm ? t('sermons.adjustSearch') : t('sermons.noSermonsAvailable')}
           </p>
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
               className="mt-4 text-cyan-600 hover:text-cyan-700 font-medium"
             >
-              Clear Search
+              {t('sermons.clearSearch')}
             </button>
           )}
         </div>
@@ -313,19 +320,19 @@ const Sermons: React.FC = () => {
 
       {filteredSermons.length > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500 bg-white rounded-xl shadow-md px-6 py-3">
-          <span>Showing {filteredSermons.length} of {sermons.length} sermons</span>
+          <span>{t('sermons.showingCount', { shown: filteredSermons.length, total: sermons.length })}</span>
           <div className="flex flex-wrap items-center gap-4">
             <span className="flex items-center">
               <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-              Published: {sermons.filter(s => s.status === 'published').length}
+              {t('sermons.publishedCount', { count: sermons.filter(s => s.status === 'published').length })}
             </span>
             <span className="flex items-center">
               <span className="w-2 h-2 bg-yellow-500 rounded-full mr-1"></span>
-              Drafts: {sermons.filter(s => s.status === 'draft').length}
+              {t('sermons.draftsCount', { count: sermons.filter(s => s.status === 'draft').length })}
             </span>
             <span className="flex items-center">
               <span className="w-2 h-2 bg-gray-400 rounded-full mr-1"></span>
-              Archived: {sermons.filter(s => s.status === 'archived').length}
+              {t('sermons.archivedCount', { count: sermons.filter(s => s.status === 'archived').length })}
             </span>
           </div>
         </div>

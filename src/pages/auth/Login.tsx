@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../auth/context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 
 // Icons
@@ -99,7 +100,7 @@ const countryCodes: CountryCode[] = [
   { code: '+356', country: 'Malta', flag: '🇲🇹' },
 ];
 
-// Validation schema - code is now required
+// Validation schema
 const loginSchema = z.object({
   phoneNumber: z
     .string()
@@ -129,6 +130,7 @@ const formatPhoneNumber = (countryCode: string, phoneNumber: string): string => 
 };
 
 const Login: React.FC = () => {
+  const { t } = useTranslation();
   const { login, checkUserCodes, generateLoginCodes, user, logout, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -202,12 +204,9 @@ const Login: React.FC = () => {
         const fullNumber = formatPhoneNumber(selectedCountry.code, cleanNumber);
         
         try {
-          console.log('🔍 Checking user codes:', fullNumber);
           const response = await checkUserCodes(fullNumber);
           
           if (!isMounted) return;
-          
-          console.log('📦 Check user codes response:', response);
           
           if (response && response.exists === true) {
             setUserExists(true);
@@ -216,7 +215,6 @@ const Login: React.FC = () => {
             setHasCodes(response.has_codes || false);
             setShowCodeInput(true);
             
-            // Store and display codes if available
             if (response.verification_codes && response.verification_codes.length > 0) {
               setDisplayCodes(response.verification_codes);
               setShowCodes(true);
@@ -274,7 +272,6 @@ const Login: React.FC = () => {
 
   // Handle code input change
   const handleCodeChange = (index: number, value: string) => {
-    // Handle paste
     if (value.length > 1) {
       const pastedCode = value.slice(0, 6).split('');
       const newCode = [...code];
@@ -286,13 +283,11 @@ const Login: React.FC = () => {
       const fullCode = newCode.join('');
       setValue('verificationCode', fullCode);
       
-      // Focus next empty or last
       const nextEmptyIndex = newCode.findIndex((val) => val === '');
       if (nextEmptyIndex !== -1 && nextEmptyIndex < 6) {
         inputRefs.current[nextEmptyIndex]?.focus();
       } else {
         inputRefs.current[5]?.focus();
-        // Auto submit if complete
         if (fullCode.length === 6) {
           handleSubmit(onSubmit)();
         }
@@ -300,7 +295,6 @@ const Login: React.FC = () => {
       return;
     }
 
-    // Handle single character
     const newCode = [...code];
     newCode[index] = value;
     setCode(newCode);
@@ -308,12 +302,10 @@ const Login: React.FC = () => {
     const fullCode = newCode.join('');
     setValue('verificationCode', fullCode);
     
-    // Move to next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
     
-    // Auto submit when complete
     if (fullCode.length === 6) {
       handleSubmit(onSubmit)();
     }
@@ -370,14 +362,14 @@ const Login: React.FC = () => {
       setCode(Array(6).fill(''));
       setValue('verificationCode', '');
       
-      // Display the new codes
       if (response.verification_codes) {
         setDisplayCodes(response.verification_codes);
         setShowCodes(true);
-        toast.success('New verification codes generated!');
+        toast.success(t('auth.codeGenerated') || 'New verification codes generated!');
       }
     } catch (error) {
       console.error('Failed to generate code:', error);
+      toast.error(t('common.error'));
     } finally {
       setIsGeneratingCode(false);
     }
@@ -391,26 +383,20 @@ const Login: React.FC = () => {
       
       const fullPhoneNumber = formatPhoneNumber(data.countryCode, data.phoneNumber);
       
-      console.log('🔐 Attempting login for:', fullPhoneNumber);
-      console.log('🔑 Using verification code:', data.verificationCode);
-      
       const response = await login(fullPhoneNumber, data.verificationCode);
       
-      console.log('📦 Login response:', response);
-      
-      toast.success('Welcome back!');
+      toast.success(t('auth.loginSuccess'));
       navigate('/dashboard');
       
     } catch (error: any) {
-      console.error(' Login error:', error);
+      console.error('Login error:', error);
       
       const errorMessage = error?.response?.data?.error || 
                           error?.message || 
-                          'Login failed. Please try again.';
+                          t('auth.loginError');
       setLoginError(errorMessage);
       setCodeError(true);
       
-      // Clear the code
       setCode(Array(6).fill(''));
       setValue('verificationCode', '');
       toast.error(errorMessage);
@@ -436,7 +422,7 @@ const Login: React.FC = () => {
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-3">
                 <FaChurch className="text-2xl text-cyan-600" />
-                <span className="text-xl font-bold text-cyan-600">Digital Evangelism</span>
+                <span className="text-xl font-bold text-dark-600">{t('common.appName')}</span>
               </div>
               <div className="flex items-center space-x-4">
                 <button
@@ -450,7 +436,7 @@ const Login: React.FC = () => {
                       className="w-10 h-10 rounded-full object-cover border-2 border-cyan-500"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm border-2 border-cyan-500">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-white-500 to-white-500 flex items-center justify-center text-white font-bold text-sm border-2 border-cyan-500">
                       {user?.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || '?'}
                     </div>
                   )}
@@ -491,15 +477,15 @@ const Login: React.FC = () => {
                     <div className="py-1">
                       <Link to="/profile" className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-cyan-600 transition-colors" onClick={() => setIsProfileDropdownOpen(false)}>
                         <FaUser className="mr-3 text-gray-400" />
-                        My Profile
+                        {t('profile.title')}
                       </Link>
                       <Link to="/settings" className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-cyan-600 transition-colors" onClick={() => setIsProfileDropdownOpen(false)}>
                         <FaCog className="mr-3 text-gray-400" />
-                        Settings
+                        {t('profile.accountSettings')}
                       </Link>
                       <Link to="/dashboard" className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-cyan-600 transition-colors" onClick={() => setIsProfileDropdownOpen(false)}>
                         <FaHome className="mr-3 text-gray-400" />
-                        Dashboard
+                        {t('nav.dashboard')}
                       </Link>
                     </div>
                     <div className="border-t border-gray-100 my-1"></div>
@@ -509,7 +495,7 @@ const Login: React.FC = () => {
                       className="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
                     >
                       <FaSignOutAlt className="mr-3 text-red-400" />
-                      {authLoading ? 'Logging out...' : 'Logout'}
+                      {authLoading ? t('common.loading') : t('nav.logout')}
                     </button>
                   </div>
                 )}
@@ -524,13 +510,13 @@ const Login: React.FC = () => {
                 <FaUserCheck className="text-3xl text-green-600" />
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">You are already logged in!</h2>
-            <p className="text-gray-600 mb-4">Redirecting to your dashboard...</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('auth.alreadyLoggedIn')}</h2>
+            <p className="text-gray-600 mb-4">{t('auth.redirectingToDashboard')}</p>
             <Link
               to="/dashboard"
               className="inline-flex items-center px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors"
             >
-              Go to Dashboard <FaArrowRight className="ml-2" />
+              {t('nav.dashboard')} <FaArrowRight className="ml-2" />
             </Link>
           </div>
         </div>
@@ -540,7 +526,7 @@ const Login: React.FC = () => {
 
   // Login form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-white-50 via-white to-white-50 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
           {/* Header */}
@@ -550,11 +536,11 @@ const Login: React.FC = () => {
                 <FaGlobe className="text-3xl text-dark" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-dark mb-2">Welcome Back</h1>
-            <p className="text-dark-100 text-sm">Digital Evangelism System</p>
+            <h1 className="text-3xl font-bold text-white mb-2">{t('auth.loginTitle')}</h1>
+            <p className="text-dark-100 text-sm">{t('common.appName')}</p>
             <div className="mt-2 inline-flex items-center px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full">
-              <FaShieldAlt className="text-dark mr-2 text-xs" />
-              <span className="text-dark text-xs">Login with Verification Code</span>
+              <FaShieldAlt className="text-dark-100 mr-2 text-xs" />
+              <span className="text-dark-100 text-xs">{t('auth.verificationLogin')}</span>
             </div>
           </div>
 
@@ -576,7 +562,7 @@ const Login: React.FC = () => {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div>
                 <label htmlFor="phoneNumber" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  Phone Number
+                  {t('auth.phoneNumber')}
                 </label>
                 <div className="flex">
                   {/* Country Code Dropdown */}
@@ -598,7 +584,7 @@ const Login: React.FC = () => {
                             <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm" />
                             <input
                               type="text"
-                              placeholder="Search country or code..."
+                              placeholder={t('auth.searchCountry')}
                               value={searchTerm}
                               onChange={(e) => setSearchTerm(e.target.value)}
                               className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
@@ -647,7 +633,7 @@ const Login: React.FC = () => {
                       } rounded-r-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-400 transition-all duration-200 text-lg ${
                         isLoadingState ? 'opacity-60 cursor-not-allowed' : ''
                       } ${userExists ? 'border-green-400' : ''}`}
-                      placeholder="742578691"
+                      placeholder={t('auth.phonePlaceholder')}
                       disabled={isLoadingState}
                       autoFocus
                     />
@@ -668,7 +654,7 @@ const Login: React.FC = () => {
                   <p className="mt-1.5 text-sm text-red-500 animate-fadeIn">{errors.phoneNumber.message}</p>
                 )}
                 <p className="mt-1.5 text-xs text-gray-400">
-                  Enter your phone number. You'll need a verification code to sign in.
+                  {t('auth.phoneHelp')}
                 </p>
               </div>
 
@@ -677,7 +663,7 @@ const Login: React.FC = () => {
                 <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded-lg animate-pulse">
                   <p className="text-sm text-gray-500 flex items-center">
                     <FaSpinner className="animate-spin mr-2" />
-                    Checking account...
+                    {t('auth.checkingAccount')}
                   </p>
                 </div>
               )}
@@ -686,21 +672,21 @@ const Login: React.FC = () => {
                 <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg animate-fadeIn">
                   <p className="text-sm text-green-700 flex items-center">
                     <FaUserCheck className="mr-2 text-green-500" />
-                    Welcome back, <strong className="mx-1">{userName}</strong>!
+                    {t('auth.welcomeBack', { name: userName })}
                     {userVerified ? (
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         <FaCheckCircle className="mr-1 text-xs" />
-                        Verified
+                        {t('auth.verified')}
                       </span>
                     ) : (
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                         <FaExclamationTriangle className="mr-1 text-xs" />
-                        Not Verified
+                        {t('auth.notVerified')}
                       </span>
                     )}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {hasCodes ? 'Enter your verification code to login' : 'Generate a verification code to login'}
+                    {hasCodes ? t('auth.enterCode') : t('auth.generateCode')}
                   </p>
                 </div>
               )}
@@ -709,19 +695,19 @@ const Login: React.FC = () => {
                 <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg animate-fadeIn">
                   <p className="text-sm text-yellow-700 flex items-center">
                     <FaUserPlus className="mr-2 text-yellow-500" />
-                    No account found with this number.{' '}
+                    {t('auth.noAccount')}{' '}
                     <Link to="/join" className="font-semibold text-yellow-800 hover:underline ml-1">
-                      Create one now
+                      {t('auth.createNow')}
                     </Link>
                   </p>
                 </div>
               )}
 
-              {/* Verification Code Input - Show only if user exists */}
+              {/* Verification Code Input */}
               {userExists && showCodeInput && (
                 <div className="mt-4">
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Verification Code
+                    {t('auth.verificationCode')}
                   </label>
                   
                   <div className="flex flex-col items-center space-y-3">
@@ -762,18 +748,18 @@ const Login: React.FC = () => {
                         {isGeneratingCode ? (
                           <>
                             <FaSpinner className="animate-spin mr-1" />
-                            Generating...
+                            {t('auth.generating')}
                           </>
                         ) : (
                           <>
                             <FaSync className="mr-1" />
-                            Generate New Codes
+                            {t('auth.generateNewCodes')}
                           </>
                         )}
                       </button>
                       
                       <p className="text-xs text-gray-400">
-                        Enter the 6-digit code
+                        {t('auth.enterSixDigitCode')}
                       </p>
                     </div>
                   </div>
@@ -783,7 +769,7 @@ const Login: React.FC = () => {
                     <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-sm font-medium text-blue-800 mb-2 flex items-center">
                         <FaKey className="mr-2" />
-                        Your Verification Codes:
+                        {t('auth.yourCodes')}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {displayCodes.map((code, index) => (
@@ -796,7 +782,7 @@ const Login: React.FC = () => {
                         ))}
                       </div>
                       <p className="text-xs text-blue-600 mt-2">
-                        Use any of these 6-digit codes to login
+                        {t('auth.useAnyCode')}
                       </p>
                     </div>
                   )}
@@ -819,19 +805,19 @@ const Login: React.FC = () => {
                     {isGeneratingCode ? (
                       <>
                         <FaSpinner className="animate-spin mr-2" />
-                        Generating Code...
+                        {t('auth.generatingCode')}
                       </>
                     ) : (
                       <>
                         <FaKey className="mr-2" />
-                        Generate Verification Code
+                        {t('auth.generateVerificationCode')}
                       </>
                     )}
                   </button>
                 </div>
               )}
 
-              {/* Submit Button - Only show when code is entered */}
+              {/* Submit Button */}
               {userExists && showCodeInput && code.every(d => d !== '') && (
                 <button
                   type="submit"
@@ -845,12 +831,12 @@ const Login: React.FC = () => {
                   {isLoadingState ? (
                     <>
                       <FaSpinner className="animate-spin mr-3" />
-                      Signing in...
+                      {t('auth.signingIn')}
                     </>
                   ) : (
                     <>
                       <FaSignInAlt className="mr-3" />
-                      Sign In
+                      {t('auth.signIn')}
                     </>
                   )}
                 </button>
@@ -858,9 +844,9 @@ const Login: React.FC = () => {
 
               <div className="text-center">
                 <p className="text-sm text-gray-600">
-                  Don't have an account?{' '}
+                  {t('auth.noAccount')}{' '}
                   <Link to="/join" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center transition-colors">
-                    Create one now <FaArrowRight className="ml-1 text-xs" />
+                    {t('auth.createOneNow')} <FaArrowRight className="ml-1 text-xs" />
                   </Link>
                 </p>
               </div>
@@ -868,7 +854,7 @@ const Login: React.FC = () => {
               <div className="text-center text-xs text-gray-400 pt-2 border-t border-gray-100">
                 <span className="inline-flex items-center">
                   <FaShieldAlt className="mr-1 text-gray-300" />
-                  Secure &bull; Passwordless &bull; Verification Code Login
+                  {t('auth.secureLogin')}
                 </span>
               </div>
             </form>
@@ -876,7 +862,7 @@ const Login: React.FC = () => {
         </div>
 
         <div className="mt-4 text-center">
-          <p className="text-xs text-gray-400">© 2024 Digital Evangelism System</p>
+          <p className="text-xs text-gray-400">© 2026 {t('common.appName')}</p>
         </div>
       </div>
 

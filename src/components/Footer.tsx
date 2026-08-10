@@ -1,8 +1,12 @@
+// src/components/Footer.tsx
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import aptecLogo from '../assets/aptec.jpg';
 
 const Footer: React.FC = () => {
+  const { t } = useTranslation();
+
   const socialLinks = [
     { name: 'Facebook', icon: 'F' },
     { name: 'Twitter', icon: 'T' },
@@ -13,14 +17,14 @@ const Footer: React.FC = () => {
   ];
 
   const footerLinks = [
-    { label: 'Contact Us', path: '/contact' },
-    { label: 'About Us', path: '/about' },
-    { label: 'Terms of Service', path: '/#' },
-    { label: 'Privacy Statement', path: '/#' },
-    { label: 'Newsletter', path: '/#' },
-    { label: 'Ministry Resources', path: '/#' },
-    { label: 'Help/FAQ', path: '/#' },
-    { label: 'Site Map', path: '/#' },
+    { label: t('footer.contactUs'), path: '/contact' },
+    { label: t('footer.aboutUs'), path: '/about' },
+    { label: t('footer.terms'), path: '/#' },
+    { label: t('footer.privacy'), path: '/#' },
+    { label: t('footer.newsletter'), path: '/#' },
+    { label: t('footer.resources'), path: '/#' },
+    { label: t('footer.help'), path: '/#' },
+    { label: t('footer.siteMap'), path: '/#' },
   ];
 
   // SVG Icons
@@ -64,12 +68,12 @@ const Footer: React.FC = () => {
             <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-[#0e5488] shadow-lg shadow-[#0e5488]/20 mb-4">
               <img
                 src={aptecLogo}
-                alt="APTEC - Digital Evangelism Ministry"
+                alt={t('common.ministry')}
                 className="w-full h-full object-cover"
               />
             </div>
             <p className="text-sm text-gray-500 mt-2 leading-relaxed text-center md:text-left">
-              Reaching the world with the Gospel through digital platforms and modern technology.
+              {t('home.welcomeMessage')}
             </p>
             <div className="mt-4 flex gap-2">
               <span className="text-[#0e5488] text-xl">C</span>
@@ -81,7 +85,7 @@ const Footer: React.FC = () => {
           {/* Column 2 - Quick Links */}
           <div>
             <h4 className="text-white font-semibold mb-4 border-b border-gray-700 pb-2">
-              Quick Links
+              {t('footer.quickLinks')}
             </h4>
             {footerLinks.slice(0, 4).map((link) => (
               <p key={link.label} className="mb-2">
@@ -96,7 +100,7 @@ const Footer: React.FC = () => {
           {/* Column 3 - Ministry Links */}
           <div>
             <h4 className="text-white font-semibold mb-4 border-b border-gray-700 pb-2">
-              Ministry
+              {t('footer.ministry')}
             </h4>
             {footerLinks.slice(4).map((link) => (
               <p key={link.label} className="mb-2">
@@ -111,7 +115,7 @@ const Footer: React.FC = () => {
           {/* Column 4 - Connect */}
           <div>
             <h4 className="text-white font-semibold mb-4 border-b border-gray-700 pb-2">
-              Connect With Us
+              {t('footer.connect')}
             </h4>
             <div className="space-y-3">
               <p className="flex items-center gap-3 hover:text-white transition-colors">
@@ -128,7 +132,7 @@ const Footer: React.FC = () => {
               </p>
               <p className="flex items-center gap-3 hover:text-white transition-colors">
                 <span className="text-[#0e5488]"><LocationIcon /></span>
-                <span className="text-sm">Digital Evangelism Ministry</span>
+                <span className="text-sm">{t('common.ministry')}</span>
               </p>
               <div className="mt-4 pt-4 border-t border-gray-700">
                 <Link 
@@ -136,7 +140,7 @@ const Footer: React.FC = () => {
                   className="inline-block bg-[#0e5488] text-white px-6 py-2.5 rounded hover:bg-[#002256] transition-colors text-sm font-semibold w-full text-center flex items-center justify-center gap-2"
                 >
                   <CrossIcon />
-                  Join Our Ministry
+                  {t('footer.join')}
                 </Link>
               </div>
             </div>
@@ -146,10 +150,10 @@ const Footer: React.FC = () => {
         <div className="border-t border-gray-800 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="text-center md:text-left">
             <span className="text-sm block">
-              Copyright &copy; 2026 APTEC - Digital Evangelism Ministry. All Rights Reserved.
+              {t('common.copyright')}
             </span>
             <span className="text-xs text-gray-600 block mt-1">
-              "Go therefore and make disciples of all nations" - Matthew 28:19
+              {t('common.verse')}
             </span>
           </div>
           <div className="flex gap-3">

@@ -1,6 +1,7 @@
 // src/pages/Certificates.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   FaAward, FaSearch, FaDownload, FaShare, 
   FaEye, FaCheckCircle, FaClock, FaPrint,
@@ -49,6 +50,7 @@ interface Certificate {
 // ============================================================
 
 const Certificates: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   
@@ -92,7 +94,6 @@ const Certificates: React.FC = () => {
     setError(null);
 
     try {
-      // Fetch only certificates for the logged-in user
       const url = `${API_BASE_URL}/?user_id=${user.id}`;
       
       const response = await fetch(url, {
@@ -117,12 +118,12 @@ const Certificates: React.FC = () => {
       setCertificates(certificatesData);
     } catch (err: any) {
       console.error('Error fetching certificates:', err);
-      setError(err.message || 'Failed to load certificates');
-      toast.error('Failed to load your certificates');
+      setError(err.message || t('common.error'));
+      toast.error(t('certificates.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, t]);
 
   // ============================================================
   // EFFECTS
@@ -205,9 +206,9 @@ const Certificates: React.FC = () => {
   const handleShare = (cert: Certificate) => {
     const url = `${window.location.origin}/certificates/${cert.certificate_id}`;
     navigator.clipboard.writeText(url).then(() => {
-      toast.success('Certificate link copied to clipboard!');
+      toast.success(t('certificates.linkCopied'));
     }).catch(() => {
-      toast.success(`Share this certificate: ${url}`);
+      toast.success(`${t('certificates.shareLink')}: ${url}`);
     });
   };
 
@@ -236,7 +237,7 @@ const Certificates: React.FC = () => {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <FaSpinner className="animate-spin text-4xl text-cyan-500 mx-auto mb-4" />
-          <p className="text-gray-500">Loading your certificates...</p>
+          <p className="text-gray-500">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -252,14 +253,14 @@ const Certificates: React.FC = () => {
         <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <FaCertificate className="text-4xl text-cyan-400" />
         </div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">Please Login</h3>
-        <p className="text-gray-500">Login to view your certificates</p>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('auth.loginTitle')}</h3>
+        <p className="text-gray-500">{t('certificates.loginToView')}</p>
         <button 
           onClick={() => navigate('/login')}
           className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium"
         >
           <FaArrowLeft className="mr-2" />
-          Go to Login
+          {t('auth.login')}
         </button>
       </div>
     );
@@ -282,10 +283,10 @@ const Certificates: React.FC = () => {
           </button>
           <div>
             <h1 className="text-3xl font-serif font-bold text-gray-900">
-              My Certificates
+              {t('certificates.title')}
             </h1>
             <p className="mt-1 text-gray-600">
-              View all your earned certificates
+              {t('certificates.subtitle')}
             </p>
           </div>
         </div>
@@ -295,7 +296,7 @@ const Certificates: React.FC = () => {
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
           >
             <FaSpinner className={loading ? 'animate-spin' : ''} />
-            <span>Refresh</span>
+            <span>{t('common.refresh')}</span>
           </button>
         </div>
       </div>
@@ -304,19 +305,19 @@ const Certificates: React.FC = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-cyan-500">
           <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-          <p className="text-xs text-gray-500">Total</p>
+          <p className="text-xs text-gray-500">{t('certificates.total')}</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-green-500">
           <p className="text-2xl font-bold text-green-600">{stats.issued}</p>
-          <p className="text-xs text-gray-500">Issued</p>
+          <p className="text-xs text-gray-500">{t('certificates.issued')}</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-yellow-500">
           <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-          <p className="text-xs text-gray-500">Pending</p>
+          <p className="text-xs text-gray-500">{t('certificates.pending')}</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-gray-500">
           <p className="text-2xl font-bold text-gray-600">{stats.draft + stats.archived}</p>
-          <p className="text-xs text-gray-500">Other</p>
+          <p className="text-xs text-gray-500">{t('certificates.other')}</p>
         </div>
       </div>
 
@@ -329,7 +330,7 @@ const Certificates: React.FC = () => {
             </div>
             <input
               type="text"
-              placeholder="Search by certificate number, heading or recipient name..."
+              placeholder={t('certificates.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white text-gray-900"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -341,11 +342,11 @@ const Certificates: React.FC = () => {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="all">All Status</option>
-              <option value="issued">Issued</option>
-              <option value="pending">Pending</option>
-              <option value="draft">Draft</option>
-              <option value="archived">Archived</option>
+              <option value="all">{t('certificates.allStatus')}</option>
+              <option value="issued">{t('certificates.issued')}</option>
+              <option value="pending">{t('certificates.pending')}</option>
+              <option value="draft">{t('certificates.draft')}</option>
+              <option value="archived">{t('certificates.archived')}</option>
             </select>
           </div>
         </div>
@@ -382,19 +383,19 @@ const Certificates: React.FC = () => {
 
               <div className="mt-3 space-y-1 text-sm">
                 <p className="text-gray-600">
-                  <span className="font-medium">Certificate #:</span> {cert.certificate_number}
+                  <span className="font-medium">{t('certificates.certificateNumber')}:</span> {cert.certificate_number}
                 </p>
                 <p className="text-gray-600">
-                  <span className="font-medium">Recipient:</span> {cert.recipient_name || user?.full_name}
+                  <span className="font-medium">{t('certificates.recipient')}:</span> {cert.recipient_name || user?.full_name}
                 </p>
                 <p className="text-gray-600">
-                  <span className="font-medium">Position:</span> {cert.display_position}
+                  <span className="font-medium">{t('certificates.position')}:</span> {cert.display_position}
                 </p>
                 <p className="text-gray-600">
-                  <span className="font-medium">Date:</span> {cert.issue_date_display}
+                  <span className="font-medium">{t('certificates.date')}:</span> {cert.issue_date_display}
                 </p>
                 <p className="text-gray-600">
-                  <span className="font-medium">Working Time:</span> {cert.working_time}
+                  <span className="font-medium">{t('certificates.workingTime')}:</span> {cert.working_time}
                 </p>
               </div>
 
@@ -404,7 +405,7 @@ const Certificates: React.FC = () => {
                   className="text-sm text-cyan-600 hover:text-cyan-700 font-medium flex items-center space-x-1"
                 >
                   <FaEye className="text-xs" />
-                  <span>View</span>
+                  <span>{t('certificates.view')}</span>
                 </button>
                 <div className="flex space-x-2">
                   {cert.status === 'issued' && (
@@ -412,28 +413,28 @@ const Certificates: React.FC = () => {
                       <button 
                         onClick={() => handlePreviewPDF(cert.certificate_id)}
                         className="p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
-                        title="Preview PDF"
+                        title={t('certificates.preview')}
                       >
                         <FaEye />
                       </button>
                       <button 
                         onClick={() => handleDownloadPDF(cert.certificate_id)}
                         className="p-2 text-gray-500 hover:text-cyan-600 transition-colors rounded-lg hover:bg-cyan-50"
-                        title="Download PDF"
+                        title={t('certificates.download')}
                       >
                         <FaDownload />
                       </button>
                       <button 
                         onClick={() => handlePrint(cert)}
                         className="p-2 text-gray-500 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-50"
-                        title="Print"
+                        title={t('certificates.print')}
                       >
                         <FaPrint />
                       </button>
                       <button 
                         onClick={() => handleShare(cert)}
                         className="p-2 text-gray-500 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50"
-                        title="Share"
+                        title={t('certificates.share')}
                       >
                         <FaShare />
                       </button>
@@ -450,16 +451,16 @@ const Certificates: React.FC = () => {
           <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <FaCertificate className="text-4xl text-cyan-400" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Certificates Found</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('certificates.noCertificates')}</h3>
           <p className="text-gray-500">
-            {searchTerm ? 'Try adjusting your search' : 'Complete exams and courses to earn certificates'}
+            {searchTerm ? t('certificates.adjustSearch') : t('certificates.earnCertificates')}
           </p>
           <button 
             onClick={() => navigate('/sermons')}
             className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium"
           >
             <FaArrowLeft className="mr-2 transform rotate-180" />
-            Browse Sermons
+            {t('nav.sermons')}
           </button>
         </div>
       )}
@@ -469,7 +470,7 @@ const Certificates: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Certificate Details</h3>
+              <h3 className="text-xl font-bold text-gray-900">{t('certificates.details')}</h3>
               <button
                 onClick={() => {
                   setShowViewModal(false);
@@ -490,37 +491,37 @@ const Certificates: React.FC = () => {
                   </div>
                 </div>
                 <h4 className="text-2xl font-serif font-bold">{selectedCertificate.heading}</h4>
-                <p className="text-cyan-100 mt-2">Certificate #{selectedCertificate.certificate_number}</p>
+                <p className="text-cyan-100 mt-2">{t('certificates.certificateNumber')} #{selectedCertificate.certificate_number}</p>
                 <p className="text-cyan-100 text-sm mt-1">{selectedCertificate.display_position}</p>
               </div>
 
               {/* Certificate Details */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">Certificate Number</p>
+                  <p className="text-xs text-gray-500">{t('certificates.certificateNumber')}</p>
                   <p className="font-medium text-gray-900">{selectedCertificate.certificate_number}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Status</p>
+                  <p className="text-xs text-gray-500">{t('certificates.status')}</p>
                   <span className={`inline-flex items-center space-x-1 text-xs px-2 py-1 rounded-full ${getStatusColor(selectedCertificate.status)}`}>
                     {getStatusIcon(selectedCertificate.status)}
                     <span>{selectedCertificate.status_display}</span>
                   </span>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Recipient</p>
+                  <p className="text-xs text-gray-500">{t('certificates.recipient')}</p>
                   <p className="font-medium text-gray-900">{selectedCertificate.recipient_name || user?.full_name}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Position</p>
+                  <p className="text-xs text-gray-500">{t('certificates.position')}</p>
                   <p className="font-medium text-gray-900">{selectedCertificate.display_position}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Working Time</p>
+                  <p className="text-xs text-gray-500">{t('certificates.workingTime')}</p>
                   <p className="font-medium text-gray-900">{selectedCertificate.working_time}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Issue Date</p>
+                  <p className="text-xs text-gray-500">{t('certificates.issueDate')}</p>
                   <p className="font-medium text-gray-900">{selectedCertificate.issue_date_display}</p>
                 </div>
               </div>
@@ -528,7 +529,7 @@ const Certificates: React.FC = () => {
               {/* Additional Notes */}
               {selectedCertificate.additional_notes && (
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-1">Additional Notes</h4>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-1">{t('certificates.additionalNotes')}</h4>
                   <p className="text-sm text-gray-600">{selectedCertificate.additional_notes}</p>
                 </div>
               )}
@@ -542,7 +543,7 @@ const Certificates: React.FC = () => {
                     level="H"
                     includeMargin={true}
                   />
-                  <p className="text-xs text-gray-500 mt-2">Scan to verify</p>
+                  <p className="text-xs text-gray-500 mt-2">{t('certificates.scanToVerify')}</p>
                 </div>
               </div>
 
@@ -555,28 +556,28 @@ const Certificates: React.FC = () => {
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
                     >
                       <FaEye />
-                      <span>Preview</span>
+                      <span>{t('certificates.preview')}</span>
                     </button>
                     <button 
                       onClick={() => handleDownloadPDF(selectedCertificate.certificate_id)}
                       className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
                     >
                       <FaDownload />
-                      <span>Download</span>
+                      <span>{t('certificates.download')}</span>
                     </button>
                     <button 
                       onClick={() => handlePrint(selectedCertificate)}
                       className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
                     >
                       <FaPrint />
-                      <span>Print</span>
+                      <span>{t('certificates.print')}</span>
                     </button>
                     <button 
                       onClick={() => handleShare(selectedCertificate)}
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
                     >
                       <FaShare />
-                      <span>Share</span>
+                      <span>{t('certificates.share')}</span>
                     </button>
                   </>
                 )}

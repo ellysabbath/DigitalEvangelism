@@ -1,5 +1,6 @@
 // src/pages/Dashboard.tsx
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/context/AuthContext';
 import { useAdmin } from '../auth/context/AdminContext';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,7 +8,7 @@ import {
   FaUser, FaBook, 
   FaClock, FaArrowRight,
   FaBell, 
-   FaCertificate, FaBible,
+  FaCertificate, FaBible,
   FaEye, 
   FaUserGraduate, 
   FaCalendarAlt,
@@ -19,16 +20,13 @@ import {
   FaGraduationCap,
   FaClipboardList,
   FaNewspaper,
-
   FaShare,
   FaHeart,
- 
   FaSpinner,
- 
   FaChevronDown,
   FaChevronUp,
   FaChevronRight,
-
+  FaCog,
 } from 'react-icons/fa';
 
 // ============================================
@@ -51,58 +49,59 @@ interface RecentSermon {
 // NAVIGATION ITEMS BY ROLE
 // ============================================
 
-const getNavigationItems = (role: string) => {
+const getNavigationItems = (role: string, t: any) => {
   const commonItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: <FaHome />, description: 'Main overview' },
-    { to: '/sermons', label: 'Sermons', icon: <FaBible />, description: 'Browse and read sermons' },
-    { to: '/profile', label: 'Profile', icon: <FaUser />, description: 'Your profile settings' },
-    { to: '/certificates', label: 'Certificates', icon: <FaCertificate />, description: 'Your earned certificates' },
+    { to: '/dashboard', label: t('nav.dashboard'), icon: <FaHome />, description: t('dashboard.mainOverview') },
+    { to: '/sermons', label: t('nav.sermons'), icon: <FaBible />, description: t('dashboard.browseSermons') },
+    { to: '/profile', label: t('nav.profile'), icon: <FaUser />, description: t('dashboard.profileSettings') },
+    { to: '/certificates', label: t('nav.certificates'), icon: <FaCertificate />, description: t('dashboard.earnedCertificates') },
+    { to: '/settings', label: t('profile.accountSettings'), icon: <FaCog />, description: t('dashboard.languageSettings') },
   ];
   
   const roleBasedItems: Record<string, any[]> = {
     admin: [
       ...commonItems,
-      { to: '/admin/users', label: 'User Management', icon: <FaUsers />, description: 'Manage system users' },
-      { to: '/admin/students', label: 'Students', icon: <FaGraduationCap />, description: 'Manage students' },
-      { to: '/admin/evangelists', label: 'Evangelists', icon: <FaUserTie />, description: 'Manage evangelists' },
-      { to: '/admin/groups', label: 'Groups', icon: <FaUsers />, description: 'Manage groups' },
-      { to: '/admin/sermons', label: 'Sermons', icon: <FaBook />, description: 'Manage sermons' },
-      { to: '/admin/subscriptions', label: 'Subscriptions', icon: <FaNewspaper />, description: 'Manage newsletter' },
-      { to: '/admin/issue-certificate', label: 'Issue Certificate', icon: <FaCertificate />, description: 'Issue new certificates' },
+      { to: '/admin/users', label: t('dashboard.userManagement'), icon: <FaUsers />, description: t('dashboard.manageUsers') },
+      { to: '/admin/students', label: t('dashboard.students'), icon: <FaGraduationCap />, description: t('dashboard.manageStudents') },
+      { to: '/admin/evangelists', label: t('dashboard.evangelists'), icon: <FaUserTie />, description: t('dashboard.manageEvangelists') },
+      { to: '/admin/groups', label: t('dashboard.groups'), icon: <FaUsers />, description: t('dashboard.manageGroups') },
+      { to: '/admin/sermons', label: t('dashboard.sermons'), icon: <FaBook />, description: t('dashboard.manageSermons') },
+      { to: '/admin/subscriptions', label: t('dashboard.subscriptions'), icon: <FaNewspaper />, description: t('dashboard.manageNewsletter') },
+      { to: '/admin/issue-certificate', label: t('dashboard.issueCertificate'), icon: <FaCertificate />, description: t('dashboard.issueNewCertificates') },
     ],
     evangelist: [
       ...commonItems,
-      { to: '/ev/dashboard', label: 'My Dashboard', icon: <FaChartBar />, description: 'Evangelist overview' },
-      { to: '/admin/users', label: 'User Management', icon: <FaUsers />, description: 'Manage system users' },
-      { to: '/ev/dashboard', label: 'My Students', icon: <FaGraduationCap />, description: 'Your students' },
-      { to: '/admin/groups', label: 'My Groups', icon: <FaUsers />, description: 'Your groups' },
-      { to: '/admin/students', label: 'Students', icon: <FaGraduationCap />, description: 'Manage students' },
-      { to: '/admin/issue-certificate', label: 'Issue Certificate', icon: <FaCertificate />, description: 'Issue new certificates' },
-      { to: '/admin/sermons', label: 'My Sermons', icon: <FaBook />, description: 'Your sermons' },
-      { to: '/evangelist/exams', label: 'Exam Management', icon: <FaClipboardList />, description: 'Grade exams' },
+      { to: '/ev/dashboard', label: t('dashboard.evangelistDashboard'), icon: <FaChartBar />, description: t('dashboard.evangelistOverview') },
+      { to: '/admin/users', label: t('dashboard.userManagement'), icon: <FaUsers />, description: t('dashboard.manageUsers') },
+      { to: '/ev/dashboard', label: t('dashboard.myStudents'), icon: <FaGraduationCap />, description: t('dashboard.yourStudents') },
+      { to: '/admin/groups', label: t('dashboard.myGroups'), icon: <FaUsers />, description: t('dashboard.yourGroups') },
+      { to: '/admin/students', label: t('dashboard.students'), icon: <FaGraduationCap />, description: t('dashboard.manageStudents') },
+      { to: '/admin/issue-certificate', label: t('dashboard.issueCertificate'), icon: <FaCertificate />, description: t('dashboard.issueNewCertificates') },
+      { to: '/admin/sermons', label: t('dashboard.mySermons'), icon: <FaBook />, description: t('dashboard.yourSermons') },
+      { to: '/evangelist/exams', label: t('dashboard.examManagement'), icon: <FaClipboardList />, description: t('dashboard.gradeExams') },
     ],
     student: [
       ...commonItems,
-      { to: '/students', label: 'My Dashboard', icon: <FaChartBar />, description: 'Student overview' },
-      { to: '/student/exams', label: 'My Exams', icon: <FaClipboardList />, description: 'View your exams' },
-      { to: '/admin/groups', label: 'My Groups', icon: <FaUsers />, description: 'Your groups' },
+      { to: '/students', label: t('dashboard.studentDashboard'), icon: <FaChartBar />, description: t('dashboard.studentOverview') },
+      { to: '/student/exams', label: t('dashboard.myExams'), icon: <FaClipboardList />, description: t('dashboard.viewExams') },
+      { to: '/admin/groups', label: t('dashboard.myGroups'), icon: <FaUsers />, description: t('dashboard.yourGroups') },
     ],
     church_admin: [
       ...commonItems,
-      { to: '/admin/students', label: 'Students', icon: <FaGraduationCap />, description: 'Manage students' },
-      { to: '/admin/evangelists', label: 'Evangelists', icon: <FaUserTie />, description: 'Manage evangelists' },
-      { to: '/admin/groups', label: 'Groups', icon: <FaUsers />, description: 'Manage groups' },
-      { to: '/admin/sermons', label: 'Sermons', icon: <FaBook />, description: 'Manage sermons' },
+      { to: '/admin/students', label: t('dashboard.students'), icon: <FaGraduationCap />, description: t('dashboard.manageStudents') },
+      { to: '/admin/evangelists', label: t('dashboard.evangelists'), icon: <FaUserTie />, description: t('dashboard.manageEvangelists') },
+      { to: '/admin/groups', label: t('dashboard.groups'), icon: <FaUsers />, description: t('dashboard.manageGroups') },
+      { to: '/admin/sermons', label: t('dashboard.sermons'), icon: <FaBook />, description: t('dashboard.manageSermons') },
     ],
     super_admin: [
       ...commonItems,
-      { to: '/admin/users', label: 'User Management', icon: <FaUsers />, description: 'Manage system users' },
-      { to: '/admin/students', label: 'Students', icon: <FaGraduationCap />, description: 'Manage students' },
-      { to: '/admin/evangelists', label: 'Evangelists', icon: <FaUserTie />, description: 'Manage evangelists' },
-      { to: '/admin/groups', label: 'Groups', icon: <FaUsers />, description: 'Manage groups' },
-      { to: '/admin/sermons', label: 'Sermons', icon: <FaBook />, description: 'Manage sermons' },
-      { to: '/admin/subscriptions', label: 'Subscriptions', icon: <FaNewspaper />, description: 'Manage newsletter' },
-      { to: '/admin/issue-certificate', label: 'Issue Certificate', icon: <FaCertificate />, description: 'Issue new certificates' },
+      { to: '/admin/users', label: t('dashboard.userManagement'), icon: <FaUsers />, description: t('dashboard.manageUsers') },
+      { to: '/admin/students', label: t('dashboard.students'), icon: <FaGraduationCap />, description: t('dashboard.manageStudents') },
+      { to: '/admin/evangelists', label: t('dashboard.evangelists'), icon: <FaUserTie />, description: t('dashboard.manageEvangelists') },
+      { to: '/admin/groups', label: t('dashboard.groups'), icon: <FaUsers />, description: t('dashboard.manageGroups') },
+      { to: '/admin/sermons', label: t('dashboard.sermons'), icon: <FaBook />, description: t('dashboard.manageSermons') },
+      { to: '/admin/subscriptions', label: t('dashboard.subscriptions'), icon: <FaNewspaper />, description: t('dashboard.manageNewsletter') },
+      { to: '/admin/issue-certificate', label: t('dashboard.issueCertificate'), icon: <FaCertificate />, description: t('dashboard.issueNewCertificates') },
     ],
   };
   
@@ -114,6 +113,7 @@ const getNavigationItems = (role: string) => {
 // ============================================
 
 const Dashboard: React.FC = () => {
+  const { t } = useTranslation();
   const { user, logout, isLoading: authLoading } = useAuth();
   const { 
     sermons, 
@@ -189,9 +189,9 @@ const Dashboard: React.FC = () => {
     .slice(0, 6)
     .map((sermon: any) => ({
       id: String(sermon.id),
-      title: sermon.title || 'Untitled Sermon',
-      topic: sermon.topic || 'General',
-      author: sermon.author_name || 'Unknown',
+      title: sermon.title || t('sermons.untitled'),
+      topic: sermon.topic || t('sermons.general'),
+      author: sermon.author_name || t('sermons.unknown'),
       date: sermon.published_at || sermon.created_at || new Date().toISOString(),
       views: sermon.views || 0,
       likes: sermon.likes || 0,
@@ -208,10 +208,10 @@ const Dashboard: React.FC = () => {
     .slice(0, 10)
     .map((sermon: any) => ({
       id: sermon.id,
-      title: sermon.title || 'Untitled Sermon',
+      title: sermon.title || t('sermons.untitled'),
       type: sermon.status === 'published' ? 'published' : 'created',
       timestamp: sermon.published_at || sermon.created_at || new Date().toISOString(),
-      author: sermon.author_name || 'Unknown',
+      author: sermon.author_name || t('sermons.unknown'),
       views: sermon.views || 0,
       likes: sermon.likes || 0,
     }));
@@ -237,11 +237,11 @@ const Dashboard: React.FC = () => {
   const getStatusBadge = (status: string) => {
     switch(status) {
       case 'new':
-        return <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">New</span>;
+        return <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">{t('dashboard.status.new')}</span>;
       case 'ongoing':
-        return <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">Ongoing</span>;
+        return <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">{t('dashboard.status.ongoing')}</span>;
       case 'completed':
-        return <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded-full">Completed</span>;
+        return <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded-full">{t('dashboard.status.completed')}</span>;
       default:
         return null;
     }
@@ -272,27 +272,27 @@ const Dashboard: React.FC = () => {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffMins < 1) return t('dashboard.justNow');
+    if (diffMins < 60) return t('dashboard.minAgo', { count: diffMins });
+    if (diffHours < 24) return t('dashboard.hoursAgo', { count: diffHours });
+    if (diffDays < 7) return t('dashboard.daysAgo', { count: diffDays });
     return date.toLocaleDateString();
   };
 
   const getRoleDisplayName = () => {
     const role = user?.role || 'student';
     const names: Record<string, string> = {
-      admin: 'Administrator',
-      evangelist: 'Evangelist',
-      student: 'Student',
-      super_admin: 'Super Admin',
-      church_admin: 'Church Admin'
+      admin: t('dashboard.administrator'),
+      evangelist: t('dashboard.evangelist'),
+      student: t('dashboard.student'),
+      super_admin: t('dashboard.superAdmin'),
+      church_admin: t('dashboard.churchAdmin')
     };
-    return names[role] || 'Member';
+    return names[role] || t('dashboard.member');
   };
 
   const userRole = user?.role || 'student';
-  const navigationItems = getNavigationItems(userRole);
+  const navigationItems = getNavigationItems(userRole, t);
 
   // ============================================
   // LOADING STATE
@@ -303,7 +303,7 @@ const Dashboard: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading your dashboard...</p>
+          <p className="text-gray-500">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -321,7 +321,7 @@ const Dashboard: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <Link to="/dashboard" className="flex items-center">
-                <span className="text-xl font-bold text-cyan-600">Digital Evangelism</span>
+                <span className="text-xl font-bold text-cyan-600">{t('common.appName')}</span>
               </Link>
             </div>
 
@@ -439,7 +439,7 @@ const Dashboard: React.FC = () => {
                       className="w-full flex items-center px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 group"
                     >
                       <FaSignOutAlt className="mr-3 text-red-400 group-hover:text-red-500 transition-colors text-lg" />
-                      <span className="font-medium">{authLoading ? 'Logging out...' : 'Logout'}</span>
+                      <span className="font-medium">{authLoading ? t('common.loading') : t('nav.logout')}</span>
                       {authLoading && <FaSpinner className="ml-2 animate-spin" />}
                     </button>
 
@@ -447,7 +447,7 @@ const Dashboard: React.FC = () => {
                     <div className="px-4 py-2 text-center border-t border-gray-100 sticky bottom-0 bg-white">
                       <div className="flex items-center justify-center gap-1 text-xs text-gray-400">
                         <FaChevronUp className="text-gray-300" size={10} />
-                        <span>Scroll for more</span>
+                        <span>{t('dashboard.scrollForMore')}</span>
                         <FaChevronDown className="text-gray-300" size={10} />
                       </div>
                     </div>
@@ -467,15 +467,15 @@ const Dashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-serif font-bold">
-                  Welcome back, {user?.full_name || 'Believer'}! 
+                  {t('dashboard.welcomeBack', { name: user?.full_name || t('dashboard.believer') })}
                 </h1>
                 <p className="mt-2 text-dark-100">
-                  {userRole === 'admin' && 'Manage the evangelism network effectively'}
-                  {userRole === 'evangelist' && 'Continue spreading the Gospel through your group'}
-                  {userRole === 'student' && 'Grow in faith through learning and exams'}
-                  {userRole === 'super_admin' && 'Oversee the entire evangelism platform'}
-                  {userRole === 'church_admin' && 'Manage your church\'s evangelism activities'}
-                  {!userRole && 'Join the Digital Evangelism community'}
+                  {userRole === 'admin' && t('dashboard.adminDesc')}
+                  {userRole === 'evangelist' && t('dashboard.evangelistDesc')}
+                  {userRole === 'student' && t('dashboard.studentDesc')}
+                  {userRole === 'super_admin' && t('dashboard.superAdminDesc')}
+                  {userRole === 'church_admin' && t('dashboard.churchAdminDesc')}
+                  {!userRole && t('dashboard.joinCommunity')}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-dark-100">
                   <span className="flex items-center">
@@ -483,7 +483,7 @@ const Dashboard: React.FC = () => {
                   </span>
                   <span className="flex items-center">
                     <FaCalendarAlt className="mr-1" /> 
-                    Member since {user?.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'N/A'}
+                    {t('dashboard.memberSince')} {user?.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'N/A'}
                   </span>
                 </div>
               </div>
@@ -495,19 +495,19 @@ const Dashboard: React.FC = () => {
             {/* Public Stats for User */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/20">
               <div>
-                <p className="text-sm text-dark-100">Total Sermons</p>
+                <p className="text-sm text-dark-100">{t('dashboard.totalSermons')}</p>
                 <p className="text-2xl font-bold">{publicStats.totalSermons}</p>
               </div>
               <div>
-                <p className="text-sm text-dark-100">Total Students</p>
+                <p className="text-sm text-dark-100">{t('dashboard.totalStudents')}</p>
                 <p className="text-2xl font-bold">{publicStats.totalStudents}</p>
               </div>
               <div>
-                <p className="text-sm text-dark-100">Pending Exams</p>
+                <p className="text-sm text-dark-100">{t('dashboard.pendingExams')}</p>
                 <p className="text-2xl font-bold">{publicStats.pendingExams}</p>
               </div>
               <div>
-                <p className="text-sm text-dark-100">Total Views</p>
+                <p className="text-sm text-dark-100">{t('dashboard.totalViews')}</p>
                 <p className="text-2xl font-bold">{publicStats.totalViews}</p>
               </div>
             </div>
@@ -518,7 +518,7 @@ const Dashboard: React.FC = () => {
             <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow p-6 border-l-4 border-cyan-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Sermons</p>
+                  <p className="text-sm font-medium text-gray-600">{t('dashboard.totalSermons')}</p>
                   <p className="text-2xl font-bold text-gray-900">{publicStats.totalSermons}</p>
                 </div>
                 <div className="p-3 bg-cyan-100 rounded-full">
@@ -527,7 +527,9 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="mt-4">
                 <span className="text-xs text-gray-500">
-                  {publicStats.totalSermons > 0 ? `${publicStats.totalSermons} sermons shared` : 'No sermons yet'}
+                  {publicStats.totalSermons > 0 
+                    ? t('dashboard.sermonsShared', { count: publicStats.totalSermons }) 
+                    : t('dashboard.noSermonsYet')}
                 </span>
               </div>
             </div>
@@ -535,7 +537,7 @@ const Dashboard: React.FC = () => {
             <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow p-6 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Students</p>
+                  <p className="text-sm font-medium text-gray-600">{t('dashboard.totalStudents')}</p>
                   <p className="text-2xl font-bold text-gray-900">{publicStats.totalStudents}</p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-full">
@@ -544,7 +546,9 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="mt-4">
                 <span className="text-xs text-gray-500">
-                  {publicStats.totalStudents > 0 ? `${publicStats.totalStudents} students enrolled` : 'No students yet'}
+                  {publicStats.totalStudents > 0 
+                    ? t('dashboard.studentsEnrolled', { count: publicStats.totalStudents }) 
+                    : t('dashboard.noStudentsYet')}
                 </span>
               </div>
             </div>
@@ -552,7 +556,7 @@ const Dashboard: React.FC = () => {
             <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow p-6 border-l-4 border-yellow-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Pending Exams</p>
+                  <p className="text-sm font-medium text-gray-600">{t('dashboard.pendingExams')}</p>
                   <p className="text-2xl font-bold text-gray-900">{publicStats.pendingExams}</p>
                 </div>
                 <div className="p-3 bg-yellow-100 rounded-full">
@@ -561,7 +565,9 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="mt-4">
                 <span className="text-xs text-yellow-600">
-                  {publicStats.pendingExams > 0 ? `${publicStats.pendingExams} need grading` : 'All graded'}
+                  {publicStats.pendingExams > 0 
+                    ? t('dashboard.examsNeedGrading', { count: publicStats.pendingExams }) 
+                    : t('dashboard.allGraded')}
                 </span>
               </div>
             </div>
@@ -569,7 +575,7 @@ const Dashboard: React.FC = () => {
             <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow p-6 border-l-4 border-purple-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Total Views</p>
+                  <p className="text-sm font-medium text-gray-600">{t('dashboard.totalViews')}</p>
                   <p className="text-2xl font-bold text-gray-900">{publicStats.totalViews}</p>
                 </div>
                 <div className="p-3 bg-purple-100 rounded-full">
@@ -578,21 +584,23 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="mt-4">
                 <span className="text-xs text-purple-600">
-                  {publicStats.totalViews > 0 ? `${publicStats.totalViews} views` : 'No views yet'}
+                  {publicStats.totalViews > 0 
+                    ? t('dashboard.totalViewsCount', { count: publicStats.totalViews }) 
+                    : t('dashboard.noViewsYet')}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Recent Sermons - Public */}
+          {/* Recent Sermons */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900 flex items-center">
                 <FaBible className="mr-2 text-cyan-500" />
-                Recent Sermons
+                {t('dashboard.recentSermons')}
               </h2>
               <Link to="/sermons" className="text-sm text-cyan-600 hover:text-cyan-700 font-medium flex items-center">
-                View All <FaArrowRight className="ml-1" />
+                {t('dashboard.viewAll')} <FaArrowRight className="ml-1" />
               </Link>
             </div>
             
@@ -607,8 +615,8 @@ const Dashboard: React.FC = () => {
                         </div>
                         <div>
                           <h4 className="font-semibold text-gray-900 line-clamp-1">{sermon.title}</h4>
-                          <p className="text-sm text-gray-600">Topic: {sermon.topic}</p>
-                          <p className="text-xs text-gray-500 mt-1">By {sermon.author}</p>
+                          <p className="text-sm text-gray-600">{t('sermons.topic')}: {sermon.topic}</p>
+                          <p className="text-xs text-gray-500 mt-1">{t('dashboard.by')} {sermon.author}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-1">
@@ -619,11 +627,11 @@ const Dashboard: React.FC = () => {
                     <div className="mt-3 flex items-center justify-between text-sm">
                       <span className="text-gray-500 flex items-center">
                         <FaEye className="inline mr-1 text-gray-400" />
-                        {sermon.views} views
+                        {sermon.views} {t('dashboard.views')}
                       </span>
                       <span className="text-gray-500 flex items-center">
                         <FaHeart className="inline mr-1 text-red-400" />
-                        {sermon.likes} likes
+                        {sermon.likes} {t('dashboard.likes')}
                       </span>
                       <span className="text-gray-500">
                         <FaCalendarAlt className="inline mr-1 text-gray-400" />
@@ -636,7 +644,7 @@ const Dashboard: React.FC = () => {
                         onClick={() => handleViewSermon(sermon.id, sermon.title)}
                         className="flex-1 px-3 py-2 bg-cyan-50 hover:bg-cyan-100 text-cyan-600 rounded-lg text-sm font-medium transition-colors"
                       >
-                        View Sermon
+                        {t('sermons.viewSermon')}
                       </button>
                       <button className="px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-lg text-sm font-medium transition-colors">
                         <FaShare />
@@ -648,19 +656,19 @@ const Dashboard: React.FC = () => {
             ) : (
               <div className="bg-white rounded-xl shadow-md p-8 text-center">
                 <FaBook className="text-4xl text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No sermons available</p>
+                <p className="text-gray-500">{t('dashboard.noSermons')}</p>
                 <Link to="/admin/create-sermon" className="inline-block mt-2 text-cyan-600 hover:text-cyan-700 font-medium">
-                  Create your first sermon
+                  {t('dashboard.createFirst')}
                 </Link>
               </div>
             )}
           </div>
 
-          {/* Recent Activity - Public */}
+          {/* Recent Activity */}
           <div className="bg-white rounded-xl shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
               <FaBell className="mr-2 text-cyan-500" />
-              Recent Activity
+              {t('dashboard.recentActivity')}
             </h2>
             <div className="space-y-4">
               {recentActivities.length > 0 ? (
@@ -672,7 +680,7 @@ const Dashboard: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-gray-900 truncate">
-                          {activity.type === 'published' ? 'Published' : 'Created'}: "{activity.title}"
+                          {activity.type === 'published' ? t('dashboard.published') : t('dashboard.created')}: "{activity.title}"
                         </p>
                         {activity.views > 0 && (
                           <span className="text-xs text-gray-400 flex items-center whitespace-nowrap">
@@ -688,7 +696,7 @@ const Dashboard: React.FC = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <p className="text-xs text-gray-500">by {activity.author || 'Unknown'}</p>
+                        <p className="text-xs text-gray-500">{t('dashboard.by')} {activity.author || 'Unknown'}</p>
                         <span className="text-xs text-gray-300">•</span>
                         <p className="text-xs text-gray-400">{formatDate(activity.timestamp)}</p>
                       </div>
@@ -697,60 +705,60 @@ const Dashboard: React.FC = () => {
                       onClick={() => handleViewSermon(activity.id, activity.title)}
                       className="text-xs text-cyan-600 hover:text-cyan-700 font-medium cursor-pointer whitespace-nowrap flex-shrink-0"
                     >
-                      View
+                      {t('dashboard.view')}
                     </button>
                   </div>
                 ))
               ) : (
                 <div className="text-center py-6 text-gray-500">
-                  <p>No recent activity</p>
+                  <p>{t('dashboard.noActivity')}</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Quick Access Cards - Role Based */}
+          {/* Quick Access Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {userRole === 'admin' || userRole === 'super_admin' ? (
+            {(userRole === 'admin' || userRole === 'super_admin') && (
               <>
                 <Link to="/admin/users" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
                   <FaUsers className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                  <p className="text-sm font-medium text-gray-700">User Management</p>
+                  <p className="text-sm font-medium text-gray-700">{t('dashboard.userManagement')}</p>
                 </Link>
                 <Link to="/admin/subscriptions" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
                   <FaNewspaper className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                  <p className="text-sm font-medium text-gray-700">Subscriptions</p>
+                  <p className="text-sm font-medium text-gray-700">{t('dashboard.subscriptions')}</p>
                 </Link>
               </>
-            ) : null}
+            )}
             
             {userRole === 'evangelist' && (
               <Link to="/ev/dashboard" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
                 <FaChartBar className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                <p className="text-sm font-medium text-gray-700">Evangelist Dashboard</p>
+                <p className="text-sm font-medium text-gray-700">{t('dashboard.evangelistDashboard')}</p>
               </Link>
             )}
             
             {userRole === 'student' && (
               <Link to="/students" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
                 <FaGraduationCap className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                <p className="text-sm font-medium text-gray-700">Student Dashboard</p>
+                <p className="text-sm font-medium text-gray-700">{t('dashboard.studentDashboard')}</p>
               </Link>
             )}
             
-            {/* <Link to="/admin/create-sermon" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
-              <FaBook className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-sm font-medium text-gray-700">Create Sermon</p>
-            </Link>
-             */}
             <Link to="/certificates" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
               <FaCertificate className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-sm font-medium text-gray-700">My Certificates</p>
+              <p className="text-sm font-medium text-gray-700">{t('dashboard.myCertificates')}</p>
             </Link>
             
             <Link to="/profile" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
               <FaUser className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-sm font-medium text-gray-700">My Profile</p>
+              <p className="text-sm font-medium text-gray-700">{t('dashboard.myProfile')}</p>
+            </Link>
+            
+            <Link to="/settings" className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center group hover:bg-cyan-50">
+              <FaCog className="text-3xl text-cyan-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-sm font-medium text-gray-700">{t('profile.accountSettings')}</p>
             </Link>
           </div>
         </div>

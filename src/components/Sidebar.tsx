@@ -1,5 +1,6 @@
 // src/components/Sidebar.tsx
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import dis from '../assets/dis.jpg';
 import disa from '../assets/disa.jpg';
 import { 
@@ -33,6 +34,7 @@ interface SubscriptionResponse {
 // MAIN COMPONENT
 // ============================================
 const Sidebar: React.FC = () => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState<SubscriptionFormData>({
     name: '',
     email: '',
@@ -41,15 +43,17 @@ const Sidebar: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [subscriptionTypes] = useState([
-    { value: 'newsletter', label: 'Newsletter' },
-    { value: 'weekly_digest', label: 'Weekly Digest' },
-    { value: 'prayer_updates', label: 'Prayer Updates' },
-    { value: 'event_notifications', label: 'Event Notifications' },
-    { value: 'sermon_updates', label: 'Sermon Updates' },
-    { value: 'all', label: 'All Updates' },
-  ]);
   const [showPreferences, setShowPreferences] = useState(false);
+
+  // Get translated subscription types
+  const subscriptionTypes = [
+    { value: 'newsletter', label: t('home.newsletterTypes.newsletter') },
+    { value: 'weekly_digest', label: t('home.newsletterTypes.weekly_digest') },
+    { value: 'prayer_updates', label: t('home.newsletterTypes.prayer_updates') },
+    { value: 'event_notifications', label: t('home.newsletterTypes.event_notifications') },
+    { value: 'sermon_updates', label: t('home.newsletterTypes.sermon_updates') },
+    { value: 'all', label: t('home.newsletterTypes.all') },
+  ];
 
   // ============================================
   // HANDLERS
@@ -67,18 +71,18 @@ const Sidebar: React.FC = () => {
     e.preventDefault();
     
     if (!formData.name.trim()) {
-      toast.error('Please enter your name');
+      toast.error(t('auth.fullName') + ' ' + t('common.error'));
       return;
     }
     
     if (!formData.email.trim()) {
-      toast.error('Please enter your email address');
+      toast.error(t('auth.email') + ' ' + t('common.error'));
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      toast.error('Please enter a valid email address');
+      toast.error(t('common.error'));
       return;
     }
 
@@ -109,16 +113,16 @@ const Sidebar: React.FC = () => {
           email: '',
           subscription_type: 'all',
         });
-        toast.success('Subscription successful! Please check your email to confirm.');
+        toast.success(t('home.thankYou'));
         setTimeout(() => setIsSuccess(false), 5000);
       } else {
-        const errorMsg = data.message || 'Subscription failed. Please try again.';
+        const errorMsg = data.message || t('common.error');
         setError(errorMsg);
         toast.error(errorMsg);
       }
     } catch (err: any) {
       console.error('Subscription error:', err);
-      const errorMsg = err.message || 'Network error. Please check your connection.';
+      const errorMsg = err.message || t('common.error');
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -136,7 +140,7 @@ const Sidebar: React.FC = () => {
         <a href="#" className="block">
           <img
             src={dis}
-            alt="Digital Evangelism With OneVoice27"
+            alt={t('home.digitalEvangelism')}
             className="w-full rounded-lg hover:opacity-90 transition-opacity duration-300"
           />
         </a>
@@ -147,7 +151,7 @@ const Sidebar: React.FC = () => {
         <a href="#" className="block">
           <img
             src={disa}
-            alt="Get Involved with the mission"
+            alt={t('home.reaching')}
             className="w-full rounded-lg hover:opacity-90 transition-opacity duration-300"
           />
         </a>
@@ -158,7 +162,7 @@ const Sidebar: React.FC = () => {
         <div className="flex items-center space-x-2 mb-3">
           <FaBell className="text-[#0e5488] text-xl" />
           <h4 className="text-lg font-semibold text-[#0e5488]">
-            SUBSCRIBE TO OUR NEWSLETTER
+            {t('home.subscribe').toUpperCase()}
           </h4>
         </div>
         
@@ -167,15 +171,15 @@ const Sidebar: React.FC = () => {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <FaCheckCircle className="text-green-500 text-3xl" />
             </div>
-            <p className="text-green-600 font-semibold text-lg">Thank you for subscribing!</p>
+            <p className="text-green-600 font-semibold text-lg">{t('home.thankYou')}</p>
             <p className="text-sm text-gray-500 mt-2">
-              Please check your email to confirm your subscription.
+              {t('home.checkEmail')}
             </p>
             <button
               onClick={() => setIsSuccess(false)}
               className="mt-4 text-sm text-[#0e5488] hover:text-[#002256] font-medium transition-colors"
             >
-              Subscribe another email
+              {t('home.subscribeAnother')}
             </button>
           </div>
         ) : (
@@ -189,7 +193,7 @@ const Sidebar: React.FC = () => {
 
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name <span className="text-red-500">*</span>
+                {t('home.name')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -202,7 +206,7 @@ const Sidebar: React.FC = () => {
                   value={formData.name}
                   onChange={handleChange}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e5488] focus:border-transparent transition-all duration-200"
-                  placeholder="Enter your full name"
+                  placeholder={t('home.name')}
                   disabled={isLoading}
                   required
                 />
@@ -211,7 +215,7 @@ const Sidebar: React.FC = () => {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address <span className="text-red-500">*</span>
+                {t('home.email')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -224,7 +228,7 @@ const Sidebar: React.FC = () => {
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0e5488] focus:border-transparent transition-all duration-200"
-                  placeholder="Enter your email address"
+                  placeholder={t('home.email')}
                   disabled={isLoading}
                   required
                 />
@@ -238,14 +242,14 @@ const Sidebar: React.FC = () => {
                 className="text-sm text-[#0e5488] hover:text-[#002256] font-medium flex items-center transition-colors"
               >
                 <FaNewspaper className="mr-1 text-xs" />
-                {showPreferences ? 'Hide preferences' : 'Show preferences'}
+                {showPreferences ? t('home.hidePreferences') : t('home.preferences')}
               </button>
             </div>
 
             {showPreferences && (
               <div className="animate-fadeIn">
                 <label htmlFor="subscription_type" className="block text-sm font-medium text-gray-700 mb-1">
-                  Subscription Type
+                  {t('home.subscriptionType')}
                 </label>
                 <select
                   id="subscription_type"
@@ -274,11 +278,11 @@ const Sidebar: React.FC = () => {
               {isLoading ? (
                 <>
                   <FaSpinner className="animate-spin" />
-                  <span>Subscribing...</span>
+                  <span>{t('common.loading')}</span>
                 </>
               ) : (
                 <>
-                  <span>Subscribe Now</span>
+                  <span>{t('home.subscribeNow')}</span>
                   <FaArrowRight className="text-sm" />
                 </>
               )}
@@ -286,15 +290,12 @@ const Sidebar: React.FC = () => {
 
             <p className="text-xs text-gray-500 text-center mt-3 flex items-center justify-center">
               <FaPray className="mr-1 text-gray-400" />
-              Join our community of believers. Unsubscribe anytime.
+              {t('home.joinCommunity')}
             </p>
           </form>
         )}
       </div>
 
-     
-
-     
       <style>{`
         @keyframes fadeIn {
           from {
